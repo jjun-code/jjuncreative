@@ -24,25 +24,23 @@ After this, you edit everything at **yoursite.com/keystatic**.
 3. Connect it to the `jjuncreative` GitHub repo when asked and approve access.
 4. Note the project's ID. It looks like `your-team/jjuncreative`. You'll need it in step 3.
 
-## 3. Host it on Cloudflare Pages (free)
+## 3. Host it on Cloudflare Workers (free)
 
 1. Go to **dash.cloudflare.com** and sign up (free).
-2. **Workers & Pages** → **Create** → **Pages** → **Connect to Git** → pick the `jjuncreative` repo.
+2. **Workers & Pages** → **Create** → **Import a repository** → pick the `jjuncreative` repo.
 3. Build settings:
-   - Framework preset: **Astro**
    - Build command: `npm run build`
-   - Build output directory: `dist`
-4. Under **Environment variables**, add:
+   - Deploy command: `npx wrangler deploy`
+4. Under **Build variables**, add:
    - `PUBLIC_KEYSTATIC_PROJECT` = the ID from step 2 (e.g. `your-team/jjuncreative`)
-   - `NODE_VERSION` = `22`
-5. Click **Save and Deploy**. In a couple of minutes you'll get a `something.pages.dev` link.
+   - `NODE_VERSION` = `24`
+5. Click **Deploy**. In a couple of minutes you'll get a `something.workers.dev` link.
 6. Back in Keystatic Cloud, open your project settings and add that site URL if asked.
 
 ## 4. Move your domain from Framer
 
-1. In Cloudflare: your Pages project → **Custom domains** → **Set up a custom domain** → `www.jjuncreative.com`.
-2. Cloudflare shows the DNS record to add. Add it wherever your domain is registered
-   (or move the domain's nameservers to Cloudflare, which it will walk you through).
+1. In Cloudflare: your Worker → **Settings** → **Domains & Routes** → **Add** → **Custom domain** → `www.jjuncreative.com`.
+2. If your domain isn't on Cloudflare yet, it will walk you through moving the domain's nameservers there.
 3. Remove the domain from Framer.
 
 ## 5. Before you cancel Framer
