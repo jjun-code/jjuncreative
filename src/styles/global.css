@@ -2,27 +2,36 @@
    jjuncreative tokens
    Change these to re-skin the whole site.
    ───────────────────────────────────────────── */
-:root {
-  --dial: #e8e9e5;        /* page */
-  --dial-deep: #d9dad5;   /* sunken panels */
-  --graphite: #1b1d20;    /* ink */
-  --steel: #6b7078;       /* secondary text */
-  --signal: #2f3cff;      /* links, focus, cursor */
-  --chalk: #f6f6f3;       /* text on dark */
+@font-face {
+  font-family: 'Overused Grotesk';
+  src: url('/fonts/OverusedGrotesk-VF.ttf') format('truetype');
+  font-weight: 200 900;
+  font-display: swap;
+}
 
-  --font-display: 'Michroma', 'Eurostile', 'Microgramma', system-ui, sans-serif;
-  --font-body: 'Instrument Sans', 'Helvetica Neue', Arial, sans-serif;
+:root {
+  --bg: #141414;          /* page */
+  --panel: #1f1f1f;       /* cards */
+  --panel-2: #2a2a2a;     /* cards inside cards, buttons */
+  --line: #ffffff14;      /* hairlines and card borders */
+  --ink: #f3f3f3;         /* text */
+  --mute: #8d8d8d;        /* second line of headlines, secondary text */
+  --dim: #5e5e5e;         /* labels, numbers */
+  --accent: #ff4d00;      /* main button, menu, highlights */
+  --accent-ink: #fff;
+
+  --font: 'Overused Grotesk', 'Helvetica Neue', Arial, sans-serif;
 
   --step--1: clamp(0.8rem, 0.78rem + 0.1vw, 0.875rem);
-  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.125rem);
-  --step-1: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem);
-  --step-2: clamp(1.6rem, 1.35rem + 1.2vw, 2.25rem);
-  --step-3: clamp(2.2rem, 1.6rem + 3vw, 4rem);
-  --step-4: clamp(2.8rem, 1.6rem + 6vw, 7.5rem);
+  --step-0: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
+  --step-1: clamp(1.25rem, 1.15rem + 0.45vw, 1.5rem);
+  --step-2: clamp(1.75rem, 1.4rem + 1.4vw, 3rem);
+  --step-3: clamp(2.4rem, 1.6rem + 3.4vw, 4.75rem);
 
-  --gutter: clamp(1rem, 0.6rem + 2vw, 2.5rem);
+  --gutter: clamp(1rem, 0.6rem + 1.6vw, 2.25rem);
+  --radius: clamp(18px, 1.2rem + 0.5vw, 28px);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -32,74 +41,94 @@ html.lenis, html.lenis body { height: auto; }
 
 body {
   margin: 0;
-  background: var(--dial);
-  color: var(--graphite);
-  font-family: var(--font-body);
+  background-color: var(--bg);
+  /* Fine dot grid, as on a halftone screen */
+  background-image: radial-gradient(#ffffff0f 0.8px, transparent 1.1px);
+  background-size: 6px 6px;
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font);
   font-size: var(--step-0);
-  line-height: 1.55;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   overflow-x: clip;
 }
 
 img { display: block; max-width: 100%; height: auto; }
 a { color: inherit; text-decoration: none; }
-p { margin: 0 0 1em; max-width: 64ch; }
-h1, h2, h3, h4 { margin: 0; font-weight: 400; }
-button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+p { margin: 0 0 1em; max-width: 60ch; }
+h1, h2, h3, h4 { margin: 0; font-weight: 500; }
+button { font: inherit; letter-spacing: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
-:focus-visible { outline: 2px solid var(--signal); outline-offset: 4px; border-radius: 2px; }
-::selection { background: var(--signal); color: var(--chalk); }
-
-.display {
-  font-family: var(--font-display);
-  text-transform: lowercase;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-}
-
-/* Brand label: lowercase with a leading dot, as on the old site */
-.dot {
-  font-size: var(--step--1);
-  color: var(--steel);
-  letter-spacing: 0.01em;
-}
-.dot::before { content: '.'; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+::selection { background: var(--accent); color: var(--accent-ink); }
 
 .wrap { padding-inline: var(--gutter); }
+
+/* Headlines: tight, two-tone. Wrap the second phrase in .mute */
+.h1, .h2, .h3 { letter-spacing: -0.05em; line-height: 1; }
+.h1 { font-size: var(--step-3); }
+.h2 { font-size: var(--step-2); }
+.h3 { font-size: var(--step-1); letter-spacing: -0.04em; line-height: 1.1; }
+.mute { color: var(--mute); }
+
+/* Small label above a section */
+.label { font-size: var(--step--1); color: var(--mute); letter-spacing: -0.01em; margin: 0 0 1rem; }
+.num { font-size: 0.75rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+/* Rounded panel */
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* Rule line between big blocks */
+.rule { border: 0; border-top: 1px solid var(--line); margin: 0; }
 
 .visually-hidden {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); white-space: nowrap;
 }
 
-/* Text roll on hover — used in nav and links */
-.roll { display: inline-flex; overflow: hidden; height: 1.3em; line-height: 1.3em; vertical-align: bottom; }
+/* Text roll on hover */
+.roll { display: inline-flex; overflow: hidden; height: 1.15em; line-height: 1.15em; vertical-align: bottom; }
 .roll > span { display: flex; flex-direction: column; transition: transform 0.5s var(--ease); }
 .roll > span > span { display: block; }
-a:hover .roll > span, a:focus-visible .roll > span { transform: translateY(-50%); }
+a:hover .roll > span, a:focus-visible .roll > span,
+button:hover .roll > span, button:focus-visible .roll > span { transform: translateY(-50%); }
 
-/* Underline sweep */
-.sweep {
-  background: linear-gradient(currentColor, currentColor) no-repeat 100% 100% / 0 1px;
-  transition: background-size 0.5s var(--ease);
+/* Underline sweep for inline links */
+.sweep { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size 0.5s var(--ease); }
+.sweep:hover, .sweep:focus-visible { background-size: 100% 1px; }
+
+/* Pill tag */
+.tag { display: inline-block; font-size: var(--step--1); border: 1px solid var(--line); border-radius: 99px; padding: 0.25rem 0.75rem; color: var(--mute); }
+
+/* Full-width wordmark; scripts/fit.ts sizes it to the container */
+.giant {
+  margin: 0; max-width: none; white-space: nowrap; width: max-content;
+  font-weight: 300; letter-spacing: -0.06em; line-height: 0.78;
+  padding-block: 0.06em 0.02em; translate: -0.04em 0;
 }
-.sweep:hover, .sweep:focus-visible { background-position: 0 100%; background-size: 100% 1px; }
 
-/* Custom cursor (fine pointers only) */
-.cursor {
-  position: fixed; left: 0; top: 0; z-index: 100;
-  width: 10px; height: 10px; margin: -5px 0 0 -5px;
-  border-radius: 50%; background: var(--signal);
-  pointer-events: none;
-  display: grid; place-items: center;
-  font-size: 0.7rem; color: var(--chalk);
-  transition: width 0.35s var(--ease), height 0.35s var(--ease), margin 0.35s var(--ease);
-}
-.cursor span { opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
-.cursor.is-view { width: 72px; height: 72px; margin: -36px 0 0 -36px; }
-.cursor.is-view span { opacity: 1; }
-@media (hover: none), (pointer: coarse) { .cursor { display: none; } }
-
+/* Reveal on scroll (driven by scripts/reveal.ts) */
+[data-reveal] { opacity: 0; translate: 0 24px; transition: opacity 0.9s var(--ease), translate 0.9s var(--ease); }
+[data-reveal].in { opacity: 1; translate: 0 0; }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  [data-reveal] { opacity: 1; translate: none; transition: none; }
 }
+
+/* Custom cursor */
+.cursor {
+  position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none;
+  width: 0; height: 0; display: grid; place-items: center;
+}
+.cursor span {
+  display: grid; place-items: center; width: 84px; height: 84px; margin: -42px 0 0 -42px;
+  border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+  font-size: 0.85rem; scale: 0; transition: scale 0.35s var(--ease);
+}
+.cursor.is-view span { scale: 1; }

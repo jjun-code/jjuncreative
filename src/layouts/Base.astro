@@ -4,7 +4,7 @@ import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import { getSite } from '../lib/content';
 
-interface Props { title?: string; description?: string; image?: string; dark?: boolean }
+interface Props { title?: string; description?: string; image?: string }
 const site = await getSite();
 const { title, description = site.description, image } = Astro.props;
 const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
@@ -14,6 +14,7 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#141414" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <meta property="og:title" content={fullTitle} />
@@ -22,12 +23,10 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Michroma&display=swap" rel="stylesheet" />
+    <link rel="preload" href="/fonts/OverusedGrotesk-VF.ttf" as="font" type="font/ttf" crossorigin />
   </head>
   <body>
-    <Nav />
+    <Nav site={site} />
     <main id="main">
       <slot />
     </main>
@@ -36,8 +35,12 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
     <script>
       import { initSmooth } from '../scripts/smooth';
       import { initCursor } from '../scripts/cursor';
+      import { initFit } from '../scripts/fit';
+      import { initReveal } from '../scripts/reveal';
       initSmooth();
       initCursor();
+      initFit();
+      initReveal();
     </script>
   </body>
 </html>

@@ -4,21 +4,28 @@ const { work, heading = true } = Astro.props;
 ---
 <section class="windex wrap" aria-labelledby={heading ? 'windex-title' : undefined}>
   {heading && (
-    <div class="head">
-      <p class="dot">index</p>
-      <h2 id="windex-title" class="display">all work</h2>
+    <div class="head" data-reveal>
+      <p class="label">All work</p>
+      <h2 id="windex-title" class="h2">Every project. <span class="mute">Start to finish.</span></h2>
     </div>
   )}
   <ul class="rows">
-    {work.map((w: any) => (
-      <li>
-        <a href={`/work/${w.slug}/`} class="row" data-preview={src(w.cover, 900)} data-cursor="view" style={`--accent:${w.charm.color}`}>
-          <span class="year">{w.year}</span>
-          <span class="title display">{w.title}</span>
-          <span class="cat">{w.category}</span>
-        </a>
-      </li>
-    ))}
+    {work.map((w: any, i: number) => {
+      const thumb = src(w.cover, 900) || src(w.inlineImage, 900) || src(w.gallery[0], 900);
+      return (
+        <li data-reveal>
+          <a href={`/work/${w.slug}/`} class="row card" data-preview={thumb} data-cursor="view">
+            <span class="num">{String(i + 1).padStart(2, '0')}.</span>
+            <span class="title h3">{w.title}</span>
+            <span class="cat">{w.category}</span>
+            <span class="year">{w.year}</span>
+            <span class="go" aria-hidden="true">
+              <svg viewBox="0 0 20 20" width="16" height="16"><path d="M3 10h13M11 4.5 16.5 10 11 15.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </span>
+          </a>
+        </li>
+      );
+    })}
   </ul>
   <figure class="preview" aria-hidden="true"><img alt="" /></figure>
 </section>
@@ -34,7 +41,8 @@ const { work, heading = true } = Astro.props;
     section.addEventListener('pointermove', (e) => { x(e.clientX); y(e.clientY); });
     section.querySelectorAll<HTMLElement>('.row').forEach((row) => {
       row.addEventListener('pointerenter', () => {
-        if (row.dataset.preview) img.src = row.dataset.preview;
+        if (!row.dataset.preview) return;
+        img.src = row.dataset.preview;
         fig.classList.add('on');
       });
       row.addEventListener('pointerleave', () => fig.classList.remove('on'));
@@ -43,28 +51,34 @@ const { work, heading = true } = Astro.props;
 </script>
 
 <style>
-  .windex { padding-block: clamp(5rem, 10vw, 9rem); position: relative; }
-  .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2rem; }
-  .head h2 { font-size: var(--step-2); }
-  .rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid #1b1d2033; }
+  .windex { padding-block: clamp(4rem, 9vw, 8rem); position: relative; }
+  .head { margin-bottom: clamp(1.5rem, 3vw, 2.5rem); }
+  .rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
   .row {
-    display: grid; grid-template-columns: 5rem 1fr auto; gap: 1rem; align-items: baseline;
-    padding: 1.4rem 0; border-bottom: 1px solid #1b1d2033;
-    transition: padding 0.5s var(--ease), color 0.3s;
+    display: grid; grid-template-columns: 3rem 1fr 14rem 4rem auto; gap: 1rem; align-items: center;
+    padding: 1.1rem 1.1rem 1.1rem 1.5rem;
+    transition: background-color 0.35s, border-color 0.35s;
   }
-  .row:hover, .row:focus-visible { padding-left: 1rem; }
-  .row:hover .title { color: var(--accent); }
-  .title { font-size: var(--step-2); transition: color 0.3s; }
-  .year, .cat { color: var(--steel); font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+  .row:hover, .row:focus-visible { background: #262626; border-color: #ffffff26; }
+  .cat, .year { color: var(--mute); font-size: var(--step--1); }
+  .year { font-variant-numeric: tabular-nums; text-align: right; }
+  .go {
+    width: 2.6rem; height: 2.6rem; border-radius: 50%; display: grid; place-items: center;
+    background: var(--panel-2); transition: background-color 0.35s, color 0.35s, transform 0.45s var(--ease);
+  }
+  .row:hover .go { background: var(--accent); color: var(--accent-ink); transform: rotate(-45deg); }
   .preview {
-    position: fixed; left: 0; top: 0; margin: -110px 0 0 30px; width: 300px; aspect-ratio: 4 / 3;
-    border-radius: 6px; overflow: hidden; pointer-events: none; z-index: 40;
+    position: fixed; left: 0; top: 0; margin: -120px 0 0 32px; width: 320px; aspect-ratio: 16 / 10;
+    border-radius: 16px; overflow: hidden; pointer-events: none; z-index: 40;
     opacity: 0; scale: 0.85; transition: opacity 0.3s, scale 0.4s var(--ease);
+    box-shadow: 0 30px 60px -20px #000c;
   }
   .preview.on { opacity: 1; scale: 1; }
   .preview img { width: 100%; height: 100%; object-fit: cover; }
-  @media (max-width: 640px) {
-    .row { grid-template-columns: 1fr; gap: 0.2rem; }
-    .cat { display: none; }
+  @media (max-width: 760px) {
+    .row { grid-template-columns: 2rem 1fr auto; row-gap: 0.2rem; padding-left: 1.1rem; }
+    .cat { grid-column: 2; grid-row: 2; }
+    .year { display: none; }
+    .go { grid-row: 1 / 3; grid-column: 3; }
   }
 </style>

@@ -46,13 +46,13 @@ export default config({
         }),
         featured: fields.checkbox({
           label: 'Feature on home page',
-          description: 'Shows in the horizontal scrolling section.',
+          description: 'Its images join the rotating ring on the home page.',
           defaultValue: false,
         }),
 
         charm: fields.object(
           {
-            color: fields.text({ label: 'Charm colour', description: 'Hex value, e.g. #610AC7', defaultValue: '#2F3CFF' }),
+            color: fields.text({ label: 'Colour', description: 'Hex value, e.g. #610AC7', defaultValue: '#2F3CFF' }),
             shape: fields.select({
               label: 'Charm shape',
               options: [
@@ -66,7 +66,7 @@ export default config({
             }),
             onKeyring: fields.checkbox({ label: 'Hang on the home page keyring', defaultValue: true }),
           },
-          { label: 'Keyring charm' }
+          { label: 'Project colour', description: 'The colour tints the top of the project page. Shape and keyring are no longer shown on the site.' }
         ),
 
         cover: fields.object(imageWithFallback('Cover image', 'public/images/work', '/images/work/'), {
@@ -110,16 +110,16 @@ export default config({
       schema: {
         heroWords: fields.array(fields.text({ label: 'Word' }), {
           label: 'Hero words',
-          description: 'Cycles after "design led by".',
+          description: 'Cycles after "Design led by" in the home page headline.',
           itemLabel: (p) => p.value,
         }),
         doesWords: fields.array(fields.text({ label: 'Word' }), {
           label: '"junjie does" words',
-          description: 'Changes as visitors scroll through the about section.',
+          description: 'Each word becomes a card in the home page skills grid.',
           itemLabel: (p) => p.value,
         }),
         aboutBlurb: fields.text({ label: 'About blurb', multiline: true }),
-        marquee: fields.text({ label: 'Marquee text' }),
+        marquee: fields.text({ label: 'Marquee text', description: 'Not shown in the current design.' }),
       },
     }),
 

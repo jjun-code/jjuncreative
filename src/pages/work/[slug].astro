@@ -1,31 +1,36 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getWork, renderBody, src, inkOn } from '../../lib/content';
+import { getWork, renderBody, src } from '../../lib/content';
 
 export async function getStaticPaths() {
   const work = await getWork();
   return work.map((w, i) => ({
     params: { slug: w.slug },
-    props: { w, next: work[(i + 1) % work.length] },
+    props: { w, i, total: work.length, next: work[(i + 1) % work.length] },
   }));
 }
 
-const { w, next } = Astro.props;
+const { w, i, total, next } = Astro.props;
 const html = await renderBody(w.body);
 const cover = src(w.cover, 2400);
 const feature = src(w.inlineImage, 2000);
+const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(next.gallery[0], 1200);
 ---
 <Base title={w.title} description={w.summary} image={cover}>
-  <article class="case" style={`--accent:${w.charm.color}`}>
+  <!-- --tint is the project's charm colour, used as a soft glow -->
+  <article class="case" style={`--tint:${w.charm.color}`}>
     <header class="wrap top">
-      <a href="/work" class="back sweep">all work</a>
-      <h1 class="display title">{w.title}</h1>
+      <div class="crumbs">
+        <a href="/work" class="tag">← All work</a>
+        <span class="num">{String(i + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
+      </div>
+      <h1 class="h1 title">{w.title}</h1>
       <div class="lede">
-        <p class="summary">{w.summary}</p>
+        <p class="summary h3">{w.summary}</p>
         <dl class="facts">
-          <div><dt class="dot">year</dt><dd>{w.year}</dd></div>
-          <div><dt class="dot">category</dt><dd>{w.category}</dd></div>
-          <div><dt class="dot">tools</dt><dd>{w.tools.join(', ')}</dd></div>
+          <div class="card"><dt class="label">Year</dt><dd>{w.year}</dd></div>
+          <div class="card"><dt class="label">Category</dt><dd>{w.category}</dd></div>
+          <div class="card"><dt class="label">Tools</dt><dd>{w.tools.join(', ')}</dd></div>
         </dl>
       </div>
     </header>
@@ -34,32 +39,40 @@ const feature = src(w.inlineImage, 2000);
       <figure class="cover wrap"><div class="frame"><img src={cover} alt={`${w.title} cover`} /></div></figure>
     )}
 
-    <section class="ps wrap">
-      {w.problem && <div><h2 class="dot">problem</h2><p>{w.problem}</p></div>}
-      {w.solution && <div><h2 class="dot">solution</h2><p>{w.solution}</p></div>}
-    </section>
+    {(w.problem || w.solution) && (
+      <section class="ps wrap">
+        {w.problem && <div class="card" data-reveal><p class="label">01. Problem</p><p>{w.problem}</p></div>}
+        {w.solution && <div class="card" data-reveal><p class="label">02. Solution</p><p>{w.solution}</p></div>}
+      </section>
+    )}
 
-    {w.intro && <p class="intro wrap display">{w.intro}</p>}
+    {w.intro && <p class="intro wrap h2" data-reveal>{w.intro}</p>}
 
-    {feature && <figure class="feature"><img src={feature} alt="" loading="lazy" /></figure>}
+    {feature && <figure class="feature wrap"><div class="frame"><img src={feature} alt="" loading="lazy" /></div></figure>}
 
     {html && <div class="story wrap" set:html={html} />}
 
     {w.gallery.length > 0 && (
       <section class="gallery wrap" aria-label="Gallery">
         {w.gallery.map((g: any) => (
-          <figure>
-            <img src={src(g, 2000)} alt={g.caption || ''} loading="lazy" />
+          <figure data-reveal>
+            <div class="frame"><img src={src(g, 2000)} alt={g.caption || ''} loading="lazy" /></div>
             {g.caption && <figcaption>{g.caption}</figcaption>}
           </figure>
         ))}
       </section>
     )}
 
-    <a href={`/work/${next.slug}/`} class="next" data-cursor="next" style={`--next:${next.charm.color};--next-ink:${inkOn(next.charm.color)}`}>
-      <span class="dot wrap">next project</span>
-      <span class="display wrap">{next.title}</span>
-    </a>
+    <section class="wrap">
+      <a href={`/work/${next.slug}/`} class="next card" data-cursor="next">
+        <div class="next-copy">
+          <p class="label">Next project</p>
+          <span class="h1">{next.title}</span>
+          <span class="next-meta">{next.year}, {next.category}</span>
+        </div>
+        {nextThumb && <div class="next-img"><img src={nextThumb} alt="" loading="lazy" /></div>}
+      </a>
+    </section>
   </article>
 </Base>
 
@@ -67,61 +80,78 @@ const feature = src(w.inlineImage, 2000);
   import { gsap, reduced } from '../../scripts/smooth';
   if (!reduced()) {
     gsap.from('.title', { yPercent: 40, opacity: 0, duration: 1.1, ease: 'expo.out' });
-    gsap.fromTo('.cover .frame', { clipPath: 'inset(12% 8% 12% 8% round 10px)' }, {
-      clipPath: 'inset(0% 0% 0% 0% round 6px)', ease: 'none',
+    gsap.from('.facts > div', { y: 20, opacity: 0, duration: 0.9, ease: 'expo.out', stagger: 0.07, delay: 0.2 });
+    gsap.fromTo('.cover .frame', { clipPath: 'inset(10% 6% 10% 6% round 28px)' }, {
+      clipPath: 'inset(0% 0% 0% 0% round 28px)', ease: 'none',
       scrollTrigger: { trigger: '.cover', start: 'top 85%', end: 'top 15%', scrub: true },
     });
-    gsap.utils.toArray<HTMLElement>('.feature img, .gallery img').forEach((img) => {
+    gsap.utils.toArray<HTMLElement>('.feature img').forEach((img) => {
       gsap.fromTo(img, { yPercent: -6 }, { yPercent: 6, ease: 'none', scrollTrigger: { trigger: img.parentElement, scrub: true } });
     });
   }
 </script>
 
 <style>
-  .top { padding-top: clamp(7rem, 14vw, 11rem); }
-  .back { font-size: var(--step--1); color: var(--steel); }
-  .title { font-size: var(--step-4); margin: 1.5rem 0 2.5rem; overflow-wrap: anywhere; }
-  .title::after {
-    content: ''; display: inline-block; width: 0.35em; height: 0.35em; margin-left: 0.25em;
-    background: var(--accent); transform: rotate(45deg) translateY(-0.2em);
+  .case { position: relative; }
+  .case::before {
+    content: ''; position: absolute; inset: 0 0 auto; height: 90svh; z-index: -1; pointer-events: none;
+    background: radial-gradient(60% 70% at 80% 0%, color-mix(in srgb, var(--tint) 45%, transparent), transparent 70%);
   }
-  .lede { display: grid; grid-template-columns: 1.3fr 1fr; gap: 3rem; align-items: start; }
-  .summary { font-size: var(--step-1); line-height: 1.4; }
-  .facts { margin: 0; display: grid; gap: 1rem; }
-  .facts div { display: grid; grid-template-columns: 7rem 1fr; border-top: 1px solid #1b1d2026; padding-top: 0.6rem; }
+  .top { padding-top: clamp(7rem, 13vw, 10rem); }
+  .crumbs { display: flex; align-items: center; justify-content: space-between; }
+  .crumbs .tag:hover { color: var(--ink); border-color: #ffffff40; }
+  .title { font-size: clamp(3rem, 1.5rem + 8vw, 10rem); margin: 2rem 0 2.5rem; overflow-wrap: anywhere; }
+  .lede { display: grid; grid-template-columns: 1.2fr 1fr; gap: 3rem; align-items: start; }
+  .summary { color: var(--mute); max-width: 24ch; margin: 0; }
+  .facts { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+  .facts .card { padding: 1rem 1.1rem; border-radius: 16px; }
+  .facts .label { margin-bottom: 0.4rem; }
   .facts dd { margin: 0; }
 
-  .cover { margin: clamp(3rem, 6vw, 5rem) 0 0; }
-  .frame { overflow: hidden; border-radius: 6px; background: var(--dial-deep); min-height: 30vh; }
+  .frame { overflow: hidden; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
   .frame img { width: 100%; }
+  .cover { margin: clamp(3rem, 6vw, 5rem) 0 0; }
+  .cover .frame { min-height: 30vh; }
 
-  .ps { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; padding-block: clamp(4rem, 8vw, 7rem); }
-  .ps h2 { margin-bottom: 0.8rem; }
+  .ps { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; padding-block: clamp(3rem, 7vw, 6rem); }
+  .ps .card { padding: clamp(1.4rem, 3vw, 2.2rem); }
+  .ps p:last-child { margin: 0; color: #cfcfcf; }
 
-  .intro { font-size: var(--step-2); line-height: 1.35; max-width: 32ch; text-transform: none; letter-spacing: -0.01em; margin: 0 0 clamp(4rem, 8vw, 7rem); }
+  .intro { max-width: 26ch; margin: 0 0 clamp(4rem, 8vw, 7rem); }
 
-  .feature { margin: 0 0 clamp(4rem, 8vw, 7rem); height: 80svh; overflow: hidden; }
+  .feature { margin: 0 0 clamp(3rem, 7vw, 6rem); }
+  .feature .frame { height: 80svh; }
   .feature img { width: 100%; height: 115%; object-fit: cover; }
 
-  .story { max-width: 62rem; margin-inline: auto; columns: 2 22rem; column-gap: 3rem; padding-bottom: clamp(3rem, 6vw, 5rem); }
+  .story { max-width: 62rem; margin-inline: auto; columns: 2 22rem; column-gap: 3rem; padding-bottom: clamp(3rem, 6vw, 5rem); color: #cfcfcf; }
+  .story :global(h2), .story :global(h3) { color: var(--ink); letter-spacing: -0.04em; margin: 1.5em 0 0.6em; }
   .story :global(p) { break-inside: avoid; }
-  .story :global(img) { border-radius: 6px; margin: 1rem 0; column-span: all; }
+  .story :global(a) { color: var(--accent); }
+  .story :global(img) { border-radius: var(--radius); margin: 1rem 0; column-span: all; }
 
-  .gallery { display: grid; gap: var(--gutter); padding-bottom: clamp(4rem, 8vw, 7rem); }
-  .gallery figure { margin: 0; overflow: hidden; border-radius: 6px; }
-  .gallery img { width: 100%; }
-  .gallery figcaption { font-size: var(--step--1); color: var(--steel); padding-top: 0.6rem; }
+  .gallery { display: grid; gap: 0.75rem; padding-bottom: clamp(4rem, 8vw, 7rem); }
+  .gallery figure { margin: 0; }
+  .gallery figcaption { font-size: var(--step--1); color: var(--mute); padding: 0.7rem 0 0 0.4rem; }
   @media (min-width: 900px) {
     .gallery { grid-template-columns: 1fr 1fr; }
     .gallery figure:first-child { grid-column: 1 / -1; }
   }
 
-  .next { display: block; padding-block: clamp(4rem, 10vw, 8rem); border-top: 1px solid #1b1d2026; transition: background 0.5s var(--ease), color 0.5s; }
-  .next .display { display: block; font-size: var(--step-4); overflow-wrap: anywhere; }
-  .next:hover { background: var(--next); color: var(--next-ink); }
-  .next:hover .dot { color: inherit; }
+  .next {
+    display: grid; grid-template-columns: 1fr minmax(0, 0.9fr); gap: 2rem; align-items: center;
+    padding: clamp(1.4rem, 3vw, 2.4rem); overflow: hidden;
+    transition: border-color 0.4s, background-color 0.4s;
+  }
+  .next:hover { border-color: var(--accent); background: #231a16; }
+  .next .h1 { display: block; overflow-wrap: anywhere; transition: color 0.4s; }
+  .next:hover .h1 { color: var(--accent); }
+  .next-meta { display: block; margin-top: 1rem; color: var(--mute); font-size: var(--step--1); }
+  .next-img { border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 10; }
+  .next-img img { width: 100%; height: 100%; object-fit: cover; transition: scale 0.8s var(--ease); }
+  .next:hover .next-img img { scale: 1.05; }
 
   @media (max-width: 760px) {
-    .lede, .ps { grid-template-columns: 1fr; }
+    .lede, .ps, .next { grid-template-columns: 1fr; }
+    .facts { grid-template-columns: 1fr 1fr; }
   }
 </style>
