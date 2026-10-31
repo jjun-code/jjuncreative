@@ -1,0 +1,70 @@
+---
+import { src } from '../lib/content';
+const { work, heading = true } = Astro.props;
+---
+<section class="windex wrap" aria-labelledby={heading ? 'windex-title' : undefined}>
+  {heading && (
+    <div class="head">
+      <p class="dot">index</p>
+      <h2 id="windex-title" class="display">all work</h2>
+    </div>
+  )}
+  <ul class="rows">
+    {work.map((w: any) => (
+      <li>
+        <a href={`/work/${w.slug}/`} class="row" data-preview={src(w.cover, 900)} data-cursor="view" style={`--accent:${w.charm.color}`}>
+          <span class="year">{w.year}</span>
+          <span class="title display">{w.title}</span>
+          <span class="cat">{w.category}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+  <figure class="preview" aria-hidden="true"><img alt="" /></figure>
+</section>
+
+<script>
+  import { gsap } from 'gsap';
+  const section = document.querySelector<HTMLElement>('.windex');
+  const fig = section?.querySelector<HTMLElement>('.preview');
+  if (section && fig && window.matchMedia('(hover: hover)').matches) {
+    const img = fig.querySelector('img')!;
+    const x = gsap.quickTo(fig, 'x', { duration: 0.6, ease: 'power3' });
+    const y = gsap.quickTo(fig, 'y', { duration: 0.6, ease: 'power3' });
+    section.addEventListener('pointermove', (e) => { x(e.clientX); y(e.clientY); });
+    section.querySelectorAll<HTMLElement>('.row').forEach((row) => {
+      row.addEventListener('pointerenter', () => {
+        if (row.dataset.preview) img.src = row.dataset.preview;
+        fig.classList.add('on');
+      });
+      row.addEventListener('pointerleave', () => fig.classList.remove('on'));
+    });
+  }
+</script>
+
+<style>
+  .windex { padding-block: clamp(5rem, 10vw, 9rem); position: relative; }
+  .head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2rem; }
+  .head h2 { font-size: var(--step-2); }
+  .rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid #1b1d2033; }
+  .row {
+    display: grid; grid-template-columns: 5rem 1fr auto; gap: 1rem; align-items: baseline;
+    padding: 1.4rem 0; border-bottom: 1px solid #1b1d2033;
+    transition: padding 0.5s var(--ease), color 0.3s;
+  }
+  .row:hover, .row:focus-visible { padding-left: 1rem; }
+  .row:hover .title { color: var(--accent); }
+  .title { font-size: var(--step-2); transition: color 0.3s; }
+  .year, .cat { color: var(--steel); font-size: var(--step--1); font-variant-numeric: tabular-nums; }
+  .preview {
+    position: fixed; left: 0; top: 0; margin: -110px 0 0 30px; width: 300px; aspect-ratio: 4 / 3;
+    border-radius: 6px; overflow: hidden; pointer-events: none; z-index: 40;
+    opacity: 0; scale: 0.85; transition: opacity 0.3s, scale 0.4s var(--ease);
+  }
+  .preview.on { opacity: 1; scale: 1; }
+  .preview img { width: 100%; height: 100%; object-fit: cover; }
+  @media (max-width: 640px) {
+    .row { grid-template-columns: 1fr; gap: 0.2rem; }
+    .cat { display: none; }
+  }
+</style>

@@ -1,0 +1,207 @@
+---
+import Base from '../layouts/Base.astro';
+import WorkIndex from '../components/WorkIndex.astro';
+import { reader, getWork, getSite, src } from '../lib/content';
+
+const home = (await reader.singletons.home.read())!;
+const site = await getSite();
+const work = await getWork();
+const featured = work.filter((w) => w.featured);
+const charms = work
+  .filter((w) => w.charm.onKeyring)
+  .map((w) => ({ title: w.title, year: w.year, href: `/work/${w.slug}/`, color: w.charm.color, shape: w.charm.shape }));
+const years = work.map((w) => w.year ?? 0);
+const marquee = home.marquee || `select projects, ${Math.min(...years)} to now`;
+---
+<Base>
+  <!-- ── Hero: the keyring ───────────────────────── -->
+  <section class="hero" aria-labelledby="hero-title">
+    <canvas class="keyring" aria-hidden="true"></canvas>
+    <script type="application/json" id="charms" set:html={JSON.stringify(charms)}></script>
+
+    <div class="hero-side wrap">
+      <p>{site.role}<br />{site.location}</p>
+      <p class="status"><span class="led" aria-hidden="true"></span>hello world, systems online</p>
+    </div>
+
+    <p class="hover-caption" aria-hidden="true"></p>
+
+    <div class="hero-foot wrap">
+      <h1 id="hero-title" class="display headline">
+        <span class="line">design led by</span>
+        <span class="line cycle" data-words={JSON.stringify(home.heroWords)}>{home.heroWords[0]}</span>
+      </h1>
+      <nav class="ring-list" aria-label="Projects on the keyring">
+        <p class="dot">on the ring</p>
+        <ul>
+          {charms.map((c, i) => (
+            <li><a href={c.href} data-charm={i} class="sweep">{c.title.toLowerCase()}</a></li>
+          ))}
+        </ul>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ── Marquee ─────────────────────────────────── -->
+  <div class="marquee" aria-hidden="true">
+    <div class="marquee-track display">
+      {Array.from({ length: 6 }).map(() => <span>{marquee} <i>⬩</i></span>)}
+    </div>
+  </div>
+
+  <!-- ── About, pinned ───────────────────────────── -->
+  <section class="does" aria-labelledby="does-title" style={`--count:${home.doesWords.length}`}>
+    <div class="does-pin wrap">
+      <p class="dot">about</p>
+      <h2 id="does-title" class="display does-title">
+        junjie does
+        <span class="does-word" aria-live="off">
+          <span class="br" aria-hidden="true">&lt;</span>
+          <span class="does-text">{home.doesWords[0]}</span>
+          <span class="br" aria-hidden="true">&gt;</span>
+        </span>
+      </h2>
+      <span class="visually-hidden">{home.doesWords.join(', ')}</span>
+      <div class="does-body">
+        <p class="blurb">{home.aboutBlurb}</p>
+        <p class="coords">currently in {site.location}<br /><span>{site.coordinates}</span></p>
+        <a href="/about" class="sweep">more about me</a>
+      </div>
+      <ol class="does-ticks" aria-hidden="true">
+        {home.doesWords.map((w) => <li>{w}</li>)}
+      </ol>
+    </div>
+  </section>
+
+  <!-- ── Featured, horizontal ────────────────────── -->
+  <section class="featured" aria-labelledby="featured-title">
+    <div class="featured-track">
+      <div class="panel intro wrap">
+        <p class="dot">featured work</p>
+        <h2 id="featured-title" class="display">a few things<br />i'm proud of</h2>
+        <a href="/work" class="sweep">see all work</a>
+      </div>
+      {featured.map((w, i) => {
+        const imgs = [src(w.cover, 1600), src(w.inlineImage, 1200), src(w.gallery[0], 1200)].filter(Boolean);
+        return (
+          <article class="panel project" style={`--accent:${w.charm.color}`}>
+            <div class="info">
+              <p class="count">{i + 1} of {featured.length}</p>
+              <h3 class="display">{w.title}</h3>
+              <p class="meta">{w.year}, {w.category}</p>
+              <p class="summary">{w.summary}</p>
+              <ul class="tags">{w.tools.map((t) => <li>{t}</li>)}</ul>
+              <a href={`/work/${w.slug}/`} class="sweep">view project</a>
+            </div>
+            <a href={`/work/${w.slug}/`} class="collage" data-cursor="view" tabindex="-1" aria-hidden="true">
+              {imgs.map((s, j) => <figure class={`c c${j}`}><img src={s} alt="" loading="lazy" /></figure>)}
+            </a>
+          </article>
+        );
+      })}
+    </div>
+  </section>
+
+  <!-- ── All work ───────────────────────────────── -->
+  <WorkIndex work={work} />
+</Base>
+
+<script>
+  import { initHome } from '../scripts/home';
+  initHome();
+</script>
+
+<style>
+  /* Hero */
+  .hero { position: relative; height: 100svh; min-height: 620px; overflow: hidden; }
+  .keyring { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; }
+  .hero-side {
+    position: absolute; top: 5.5rem; right: 0; text-align: right;
+    font-size: var(--step--1); color: var(--steel); pointer-events: none;
+  }
+  .status { display: inline-flex; align-items: center; gap: 0.5rem; }
+  .led { width: 7px; height: 7px; border-radius: 50%; background: var(--signal); animation: blink 2.4s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0.2; } }
+  .hover-caption {
+    position: absolute; left: 50%; top: 58%; translate: -50% 0; margin: 0;
+    font-size: var(--step--1); padding: 0.3rem 0.7rem; border-radius: 99px;
+    background: var(--graphite); color: var(--chalk);
+    opacity: 0; transition: opacity 0.25s; pointer-events: none;
+  }
+  .hover-caption.on { opacity: 1; }
+  .hero-foot {
+    position: absolute; inset: auto 0 0; padding-bottom: clamp(1.5rem, 4vw, 3rem);
+    display: flex; justify-content: space-between; align-items: end; gap: 2rem; flex-wrap: wrap;
+    pointer-events: none;
+  }
+  .hero-foot a { pointer-events: auto; }
+  .headline { font-size: var(--step-4); }
+  .headline .line { display: block; overflow: hidden; padding-bottom: 0.08em; }
+  .headline .cycle { color: var(--signal); min-height: 1.1em; }
+  .ring-list { font-size: var(--step--1); }
+  .ring-list ul { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.15rem; }
+
+  /* Marquee */
+  .marquee { border-block: 1px solid #1b1d2026; overflow: hidden; padding-block: 1.2rem; }
+  .marquee-track { display: flex; width: max-content; font-size: var(--step-3); white-space: nowrap; }
+  .marquee-track span { padding-right: 0.6em; }
+  .marquee-track i { font-style: normal; color: var(--signal); }
+
+  /* Does */
+  .does { height: calc(var(--count) * 70svh + 100svh); position: relative; }
+  .does-pin {
+    position: sticky; top: 0; height: 100svh;
+    display: grid; grid-template-columns: 1.4fr 1fr; grid-template-rows: auto 1fr auto;
+    gap: 1.5rem 3rem; padding-block: 6rem 2.5rem; align-content: center;
+  }
+  .does-pin > .dot { grid-column: 1 / -1; }
+  .does-title { font-size: var(--step-3); align-self: center; }
+  .does-word { display: block; margin-top: 0.5rem; color: var(--signal); white-space: nowrap; }
+  .does-word .br { color: var(--steel); }
+  .does-text { display: inline-block; }
+  .does-body { align-self: center; }
+  .blurb { font-size: var(--step-1); line-height: 1.4; }
+  .coords { color: var(--steel); font-size: var(--step--1); }
+  .coords span { font-variant-numeric: tabular-nums; }
+  .does-ticks {
+    grid-column: 1 / -1; list-style: none; margin: 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; font-size: var(--step--1); color: var(--steel);
+  }
+  .does-ticks li { transition: color 0.3s; }
+  .does-ticks li.on { color: var(--graphite); }
+  @media (max-width: 760px) {
+    .does-pin { grid-template-columns: 1fr; }
+    .does-word { white-space: normal; }
+  }
+
+  /* Featured horizontal */
+  .featured { overflow: hidden; background: var(--dial-deep); }
+  .featured-track { display: flex; width: max-content; height: 100svh; }
+  .panel { height: 100%; flex: none; }
+  .intro { width: min(48vw, 640px); display: flex; flex-direction: column; justify-content: center; gap: 1.2rem; }
+  .intro h2 { font-size: var(--step-3); }
+  .project {
+    width: 100vw; display: grid; grid-template-columns: minmax(280px, 0.8fr) 1.6fr;
+    gap: 3rem; padding: 6rem var(--gutter) 3rem; align-items: center;
+    border-left: 1px solid #1b1d201f;
+  }
+  .info h3 { font-size: var(--step-2); margin: 0.5rem 0; overflow-wrap: anywhere; }
+  .count, .meta { color: var(--steel); font-size: var(--step--1); margin: 0; }
+  .count::before { content: ''; display: inline-block; width: 0.6rem; height: 0.6rem; margin-right: 0.5rem; background: var(--accent); transform: rotate(45deg); }
+  .summary { margin: 1.2rem 0; max-width: 40ch; }
+  .tags { list-style: none; padding: 0; margin: 0 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .tags li { font-size: var(--step--1); border: 1px solid #1b1d2033; border-radius: 99px; padding: 0.1rem 0.7rem; }
+  .collage { position: relative; height: min(70svh, 640px); display: block; }
+  .c { position: absolute; margin: 0; overflow: hidden; border-radius: 6px; background: var(--dial); box-shadow: 0 30px 60px -30px #1b1d2055; }
+  .c img { width: 100%; height: 100%; object-fit: cover; scale: 1.15; }
+  .c0 { inset: 0 18% 22% 0; }
+  .c1 { width: 38%; aspect-ratio: 4 / 3; right: 0; top: 8%; }
+  .c2 { width: 46%; aspect-ratio: 16 / 9; right: 6%; bottom: 0; }
+
+  @media (max-width: 860px) {
+    .featured-track { flex-direction: column; width: auto; height: auto; }
+    .intro { width: auto; padding-block: 5rem 2rem; }
+    .project { width: auto; grid-template-columns: 1fr; padding-block: 3rem; border-left: 0; border-top: 1px solid #1b1d201f; }
+    .collage { height: 60vw; }
+  }
+</style>

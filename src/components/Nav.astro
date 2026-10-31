@@ -1,0 +1,38 @@
+---
+const path = Astro.url.pathname;
+const links = [
+  { href: '/work', label: 'work' },
+  { href: '/about', label: 'about' },
+  { href: '/contact', label: 'contact' },
+];
+---
+<header class="nav wrap">
+  <a href="/" class="brand display" aria-label="jjuncreative home">jjun<span>creative</span></a>
+  <nav aria-label="Main">
+    <ul>
+      {links.map((l) => (
+        <li>
+          <a href={l.href} aria-current={path.startsWith(l.href) ? 'page' : undefined}>
+            <span class="roll" aria-hidden="true"><span><span>{l.label}</span><span>{l.label}</span></span></span>
+            <span class="visually-hidden">{l.label}</span>
+          </a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</header>
+
+<style>
+  .nav {
+    position: fixed; inset: 0 0 auto; z-index: 50;
+    display: flex; justify-content: space-between; align-items: center;
+    padding-block: 1.1rem;
+    mix-blend-mode: difference; color: #fff;
+    pointer-events: none;
+  }
+  .nav a { pointer-events: auto; }
+  .brand { font-size: 0.95rem; letter-spacing: 0; }
+  .brand span { opacity: 0.55; }
+  ul { display: flex; gap: clamp(1rem, 3vw, 2.5rem); list-style: none; margin: 0; padding: 0; font-size: var(--step--1); font-weight: 500; }
+  a[aria-current='page'] { text-decoration: underline; text-underline-offset: 6px; text-decoration-thickness: 1px; }
+</style>

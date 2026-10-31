@@ -1,0 +1,53 @@
+headline: Product designer, photographer, and lifelong collector of curiosities.
+hello: >-
+  I look at problems holistically, shaping solutions that connect user needs,
+  business goals, and product strategy into one clear experience.
+portrait:
+  image: null
+  imageUrl: https://framerusercontent.com/images/6nET5X1aNIaxbAKtfN99UgbUD4.jpg
+interests:
+  - Photography
+  - Motorsports
+  - Technology
+  - Vinyl records
+  - AI
+  - Watches
+  - Fashion
+  - Coffee
+  - Gaming
+  - Film
+  - Bouldering
+  - 3D rendering
+stats:
+  - label: experience
+    value: 5 years
+  - label: location
+    value: Auckland, New Zealand
+  - label: freelance
+    value: Available
+experience:
+  - years: 2022 — now
+    company: Centrapay
+    role: User Experience Designer
+    note: Solving product problems with design.
+  - years: 2019 — now
+    company: jjuncreative
+    role: Creative Lead & Design
+    note: End-to-end design solutions.
+  - years: 2021 — 2022
+    company: Du Val
+    role: Graphic Designer
+    note: Making pretty pictures.
+toolkit:
+  - name: Figma
+    use: product design
+  - name: Framer
+    use: web design
+  - name: Notion
+    use: productivity
+  - name: Claude
+    use: vibe coding
+  - name: Adobe Suite
+    use: visual design
+  - name: Steam
+    use: fun

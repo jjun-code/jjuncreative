@@ -1,0 +1,79 @@
+---
+const { site } = Astro.props;
+---
+<footer class="footer" id="contact">
+  <div class="wrap top">
+    <p class="dot">say hello</p>
+    <h2 class="display hello">come say hello <span aria-hidden="true">⬩</span></h2>
+    <p class="avail">{site.availability}</p>
+    <div class="actions">
+      <button class="email display" data-copy={site.email} aria-live="polite">
+        <span class="label">{site.email}</span>
+        <span class="hint">copy</span>
+      </button>
+      <ul class="socials">
+        {site.socials.map((s: any) => (
+          <li><a class="sweep" href={s.url} target="_blank" rel="noopener">{s.label}</a></li>
+        ))}
+      </ul>
+    </div>
+  </div>
+  <div class="wrap meta">
+    <span>{site.location} · {site.coordinates}</span>
+    <span>© {new Date().getFullYear()} jjuncreative</span>
+  </div>
+  <p class="giant display" aria-hidden="true">jjuncreative</p>
+</footer>
+
+<script>
+  // Fit the giant wordmark to the full width once fonts are in.
+  const fit = () => {
+    const el = document.querySelector<HTMLElement>('.giant');
+    if (!el) return;
+    el.style.fontSize = '100px';
+    el.style.fontSize = `${(100 * document.documentElement.clientWidth) / el.scrollWidth * 0.98}px`;
+  };
+  document.fonts.ready.then(fit);
+  window.addEventListener('resize', fit);
+
+  document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
+    const hint = btn.querySelector('.hint')!;
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.copy!);
+        hint.textContent = 'copied';
+      } catch {
+        window.location.href = `mailto:${btn.dataset.copy}`;
+      }
+      setTimeout(() => (hint.textContent = 'copy'), 2000);
+    });
+  });
+</script>
+
+<style>
+  .footer {
+    background: var(--graphite); color: var(--chalk);
+    padding-top: clamp(5rem, 12vw, 10rem);
+    overflow: hidden;
+    position: relative; z-index: 2;
+  }
+  .footer .dot { color: #9aa0a8; }
+  .hello { font-size: var(--step-4); margin: 0.6rem 0 1.5rem; }
+  .hello span { color: var(--signal); display: inline-block; }
+  .avail { color: #b7bbc1; font-size: var(--step-1); max-width: 34ch; }
+  .actions { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 2rem; margin-top: 3rem; }
+  .email {
+    font-size: var(--step-2); text-transform: none; text-align: left;
+    display: inline-flex; align-items: baseline; gap: 1rem;
+    border-bottom: 1px solid #ffffff40; padding-bottom: 0.4rem;
+    transition: border-color 0.3s;
+  }
+  .email:hover { border-color: var(--signal); }
+  .email .hint { font-family: var(--font-body); font-size: var(--step--1); color: #9aa0a8; }
+  .socials { list-style: none; margin: 0; padding: 0; display: flex; gap: 1.5rem; }
+  .meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 5rem; font-size: var(--step--1); color: #9aa0a8; }
+  .giant {
+    font-size: 12vw; line-height: 0.8; margin: 1.5rem 0 -0.12em; width: max-content; margin-inline: auto; max-width: none;
+    white-space: nowrap; text-align: center; color: #2b2e33;
+  }
+</style>

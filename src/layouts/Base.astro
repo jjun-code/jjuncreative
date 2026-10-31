@@ -1,0 +1,43 @@
+---
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { getSite } from '../lib/content';
+
+interface Props { title?: string; description?: string; image?: string; dark?: boolean }
+const site = await getSite();
+const { title, description = site.description, image } = Astro.props;
+const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    {image && <meta property="og:image" content={image} />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=Michroma&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <Nav />
+    <main id="main">
+      <slot />
+    </main>
+    <Footer site={site} />
+    <div class="cursor" aria-hidden="true"><span>view</span></div>
+    <script>
+      import { initSmooth } from '../scripts/smooth';
+      import { initCursor } from '../scripts/cursor';
+      initSmooth();
+      initCursor();
+    </script>
+  </body>
+</html>
