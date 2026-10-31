@@ -54,8 +54,8 @@ Do the same for your portrait on the About page.
 ## Day-to-day editing
 
 - Go to **www.jjuncreative.com/keystatic** and sign in.
-- **Projects**: add, edit or reorder (use *Sort order*). Tick *Feature on home page* to put a project
-  in the sideways-scrolling section. Under *Keyring charm*, pick a colour and shape for its 3D charm.
+- **Projects**: add, edit or reorder (use *Sort order*). Tick *Feature on home page* to put its images
+  on the rotating ring. Under *Project colour*, pick the colour that tints the top of its page.
 - **Home page / About page / Contact & site details**: all the text on those pages.
 - Hit **Save**. The site rebuilds itself and is live in about 2 minutes.
 

@@ -1,79 +1,97 @@
 ---
 import Base from '../layouts/Base.astro';
+import DotArt from '../components/DotArt.astro';
 import { reader, src } from '../lib/content';
 const a = (await reader.singletons.about.read())!;
 const portrait = src(a.portrait, 1200);
+// Split the headline after its first sentence or comma for the two-tone treatment
+const m = a.headline.match(/^(.+?[.,])\s+(.+)$/);
+const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
 ---
 <Base title="About">
   <section class="wrap intro">
-    <p class="dot">about</p>
-    <h1 class="display">{a.headline}</h1>
+    <p class="label">About</p>
+    <h1 class="h1">{lead} {rest && <span class="mute">{rest}</span>}</h1>
   </section>
 
   <section class="wrap split">
-    {portrait && <figure class="portrait"><img src={portrait} alt="Portrait of Junjie" /></figure>}
-    <div>
-      <p class="hello">{a.hello}</p>
+    {portrait && <figure class="portrait card" data-reveal><img src={portrait} alt="Portrait of Junjie" /></figure>}
+    <div class="hello card" data-reveal>
+      <p class="h3">{a.hello}</p>
       <dl class="stats">
-        {a.stats.map((s) => <div><dt class="dot">{s.label}</dt><dd>{s.value}</dd></div>)}
+        {a.stats.map((s, i) => (
+          <div>
+            <dt class="label">{String(i + 1).padStart(2, '0')}. {s.label}</dt>
+            <dd>{s.value}</dd>
+          </div>
+        ))}
       </dl>
     </div>
   </section>
 
-  <section class="wrap curios" aria-labelledby="curios-title">
-    <h2 id="curios-title" class="dot">things i collect</h2>
-    <ul>
-      {a.interests.map((i) => <li class="display">{i}</li>)}
-    </ul>
-  </section>
-
-  <section class="wrap exp" aria-labelledby="exp-title">
-    <h2 id="exp-title" class="dot">work experience</h2>
-    <ol>
+  <section class="wrap block" aria-labelledby="exp-title">
+    <h2 id="exp-title" class="h2" data-reveal>Experience. <span class="mute">Where I've been.</span></h2>
+    <ol class="exp">
       {a.experience.map((e) => (
-        <li>
+        <li class="card" data-reveal>
           <span class="years">{e.years}</span>
-          <span class="co display">{e.company}</span>
+          <span class="co h3">{e.company}</span>
           <span class="role">{e.role}<br /><span>{e.note}</span></span>
         </li>
       ))}
     </ol>
   </section>
 
-  <section class="wrap kit" aria-labelledby="kit-title">
-    <h2 id="kit-title" class="dot">toolkit</h2>
-    <ul>
-      {a.toolkit.map((t) => <li><strong>{t.name}</strong><span>{t.use}</span></li>)}
+  <section class="wrap block" aria-labelledby="kit-title">
+    <h2 id="kit-title" class="h2" data-reveal>Toolkit. <span class="mute">What I use every day.</span></h2>
+    <ul class="kit">
+      {a.toolkit.map((t, i) => (
+        <li class="card has-art" data-reveal>
+          <div class="art"><DotArt variant={i} /></div>
+          <strong>{t.name}</strong>
+          <span>{t.use}</span>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section class="wrap block" aria-labelledby="curios-title">
+    <h2 id="curios-title" class="h2" data-reveal>Off the clock. <span class="mute">Things I collect.</span></h2>
+    <ul class="curios" data-reveal>
+      {a.interests.map((i) => <li class="tag">{i}</li>)}
     </ul>
   </section>
 </Base>
 
 <style>
-  .intro { padding-top: clamp(7rem, 14vw, 11rem); }
-  h1 { font-size: var(--step-3); max-width: 20ch; margin-top: 1rem; }
-  section + section { margin-top: clamp(4rem, 9vw, 8rem); }
-  .split { display: grid; grid-template-columns: minmax(0, 0.8fr) 1fr; gap: clamp(2rem, 5vw, 5rem); align-items: end; }
-  .portrait { margin: 0; border-radius: 6px; background: var(--dial-deep); overflow: hidden; aspect-ratio: 3 / 4; }
+  .intro { padding-top: clamp(8rem, 16vw, 12rem); }
+  .intro h1 { max-width: 18ch; }
+  .split { display: grid; grid-template-columns: minmax(0, 0.75fr) 1fr; gap: 0.75rem; margin-top: clamp(3rem, 6vw, 5rem); }
+  .portrait { margin: 0; overflow: hidden; aspect-ratio: 4 / 5; }
   .portrait img { width: 100%; height: 100%; object-fit: cover; }
-  .hello { font-size: var(--step-2); line-height: 1.3; }
-  .stats { margin: 2.5rem 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-  .stats div { border-top: 1px solid #1b1d2026; padding-top: 0.6rem; }
-  .stats dd { margin: 0.2rem 0 0; }
+  .hello { padding: clamp(1.4rem, 3vw, 2.4rem); display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; }
+  .hello .h3 { max-width: 26ch; }
+  .stats { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+  .stats div { border-top: 1px solid var(--line); padding-top: 0.8rem; }
+  .stats .label { margin-bottom: 0.3rem; }
+  .stats dd { margin: 0; }
 
-  .curios ul { list-style: none; padding: 0; margin: 1.2rem 0 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0; }
-  .curios li { font-size: var(--step-2); transition: color 0.3s; }
-  .curios li:not(:last-child)::after { content: '⬩'; color: var(--signal); margin: 0 0.5em; font-size: 0.6em; vertical-align: middle; }
-  .curios li:hover { color: var(--signal); }
+  .block { margin-top: clamp(4rem, 9vw, 8rem); }
+  .block h2 { margin-bottom: clamp(1.5rem, 3vw, 2.5rem); }
 
-  .exp ol { list-style: none; padding: 0; margin: 1.2rem 0 0; }
-  .exp li { display: grid; grid-template-columns: 9rem 1fr 1fr; gap: 1rem; padding: 1.4rem 0; border-top: 1px solid #1b1d2026; align-items: baseline; }
-  .years, .role span { color: var(--steel); font-size: var(--step--1); }
-  .co { font-size: var(--step-1); }
+  .exp { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+  .exp li { display: grid; grid-template-columns: 10rem 1fr 1fr; gap: 1rem; padding: 1.3rem 1.5rem; align-items: baseline; }
+  .years, .role span { color: var(--mute); font-size: var(--step--1); }
 
-  .kit { padding-bottom: clamp(5rem, 10vw, 8rem); }
-  .kit ul { list-style: none; padding: 0; margin: 1.2rem 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 1px; background: #1b1d2026; border: 1px solid #1b1d2026; }
-  .kit li { background: var(--dial); padding: 1.2rem; display: grid; gap: 0.2rem; }
-  .kit span { color: var(--steel); font-size: var(--step--1); }
+  .kit { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.75rem; }
+  .kit li { padding: 1rem; display: grid; gap: 0.2rem; transition: border-color 0.35s; }
+  .kit li:hover { border-color: #ffffff26; }
+  .kit .art { background: #181818; border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; margin-bottom: 0.8rem; }
+  .kit span { color: var(--mute); font-size: var(--step--1); }
+
+  .curios { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .curios .tag { font-size: var(--step-0); padding: 0.5rem 1.1rem; color: var(--ink); background: var(--panel); transition: background-color 0.3s, color 0.3s; }
+  .curios .tag:hover { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 
   @media (max-width: 760px) {
     .split { grid-template-columns: 1fr; }

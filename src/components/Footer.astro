@@ -1,79 +1,67 @@
 ---
+import Button from './Button.astro';
 const { site } = Astro.props;
 ---
-<footer class="footer" id="contact">
-  <div class="wrap top">
-    <p class="dot">say hello</p>
-    <h2 class="display hello">come say hello <span aria-hidden="true">⬩</span></h2>
-    <p class="avail">{site.availability}</p>
-    <div class="actions">
-      <button class="email display" data-copy={site.email} aria-live="polite">
-        <span class="label">{site.email}</span>
-        <span class="hint">copy</span>
-      </button>
+<footer class="footer wrap" id="contact">
+  <div class="cta card" data-reveal>
+    <div class="cta-copy">
+      <p class="label">Say hello</p>
+      <h2 class="h1">Got something in mind? <span class="mute">Let's make it together.</span></h2>
+    </div>
+    <div class="cta-side">
+      <p class="avail"><span class="led" aria-hidden="true"></span>{site.availability}</p>
+      <div class="buttons">
+        <Button variant="accent" href={`mailto:${site.email}`} sub={site.email}>Email me</Button>
+        <Button data-copy={site.email}><span class="copy-text">Copy email</span></Button>
+      </div>
       <ul class="socials">
-        {site.socials.map((s: any) => (
-          <li><a class="sweep" href={s.url} target="_blank" rel="noopener">{s.label}</a></li>
-        ))}
+        {site.socials.map((s: any) => <li><a class="tag" href={s.url} target="_blank" rel="noopener">{s.label} ↗</a></li>)}
       </ul>
     </div>
   </div>
-  <div class="wrap meta">
+
+  <div class="meta">
     <span>{site.location} · {site.coordinates}</span>
     <span>© {new Date().getFullYear()} jjuncreative</span>
   </div>
-  <p class="giant display" aria-hidden="true">jjuncreative</p>
+  <hr class="rule" />
+  <p class="giant" aria-hidden="true">JJUNCREATIVE</p>
 </footer>
 
 <script>
-  // Fit the giant wordmark to the full width once fonts are in.
-  const fit = () => {
-    const el = document.querySelector<HTMLElement>('.giant');
-    if (!el) return;
-    el.style.fontSize = '100px';
-    el.style.fontSize = `${(100 * document.documentElement.clientWidth) / el.scrollWidth * 0.98}px`;
-  };
-  document.fonts.ready.then(fit);
-  window.addEventListener('resize', fit);
-
   document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
-    const hint = btn.querySelector('.hint')!;
+    const text = btn.querySelector('.copy-text');
+    if (!text) return;
     btn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(btn.dataset.copy!);
-        hint.textContent = 'copied';
+        text.textContent = 'Copied';
       } catch {
         window.location.href = `mailto:${btn.dataset.copy}`;
       }
-      setTimeout(() => (hint.textContent = 'copy'), 2000);
+      setTimeout(() => (text.textContent = 'Copy email'), 2000);
     });
   });
 </script>
 
 <style>
-  .footer {
-    background: var(--graphite); color: var(--chalk);
-    padding-top: clamp(5rem, 12vw, 10rem);
-    overflow: hidden;
-    position: relative; z-index: 2;
+  .footer { padding-top: clamp(4rem, 10vw, 8rem); overflow: hidden; position: relative; }
+  .cta {
+    display: grid; grid-template-columns: 1.3fr 1fr; gap: 3rem; align-items: end;
+    padding: clamp(1.5rem, 4vw, 3.5rem);
+    background:
+      radial-gradient(120% 140% at 100% 0%, #ff4d0022, transparent 55%),
+      var(--panel);
   }
-  .footer .dot { color: #9aa0a8; }
-  .hello { font-size: var(--step-4); margin: 0.6rem 0 1.5rem; }
-  .hello span { color: var(--signal); display: inline-block; }
-  .avail { color: #b7bbc1; font-size: var(--step-1); max-width: 34ch; }
-  .actions { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 2rem; margin-top: 3rem; }
-  .email {
-    font-size: var(--step-2); text-transform: none; text-align: left;
-    display: inline-flex; align-items: baseline; gap: 1rem;
-    border-bottom: 1px solid #ffffff40; padding-bottom: 0.4rem;
-    transition: border-color 0.3s;
-  }
-  .email:hover { border-color: var(--signal); }
-  .email .hint { font-family: var(--font-body); font-size: var(--step--1); color: #9aa0a8; }
-  .socials { list-style: none; margin: 0; padding: 0; display: flex; gap: 1.5rem; }
-  .meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-top: 5rem; font-size: var(--step--1); color: #9aa0a8; }
-  .giant {
-    font-size: 12vw; line-height: 0.8; margin: 1.5rem 0 -0.12em; width: max-content; margin-inline: auto; max-width: none;
-    white-space: nowrap; text-align: center; color: #2b2e33;
+  .cta h2 { max-width: 13ch; }
+  .avail { display: flex; gap: 0.6rem; align-items: baseline; color: var(--mute); max-width: 34ch; }
+  .led { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: blink 2.4s steps(1) infinite; translate: 0 -1px; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .buttons { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.5rem 0; }
+  .socials { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .socials a:hover { color: var(--ink); border-color: #ffffff40; }
+  .meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding-block: 2.5rem 1.2rem; font-size: var(--step--1); color: var(--dim); }
+  @media (max-width: 860px) {
+    .cta { grid-template-columns: 1fr; }
   }
 </style>

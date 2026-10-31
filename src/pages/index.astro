@@ -1,106 +1,103 @@
 ---
 import Base from '../layouts/Base.astro';
 import WorkIndex from '../components/WorkIndex.astro';
+import Button from '../components/Button.astro';
+import DotArt from '../components/DotArt.astro';
 import { reader, getWork, getSite, src } from '../lib/content';
 
 const home = (await reader.singletons.home.read())!;
+const about = (await reader.singletons.about.read())!;
 const site = await getSite();
 const work = await getWork();
 const featured = work.filter((w) => w.featured);
-const charms = work
-  .filter((w) => w.charm.onKeyring)
-  .map((w) => ({ title: w.title, year: w.year, href: `/work/${w.slug}/`, color: w.charm.color, shape: w.charm.shape }));
-const years = work.map((w) => w.year ?? 0);
-const marquee = home.marquee || `select projects, ${Math.min(...years)} to now`;
+const portrait = src(about.portrait, 200);
+// Earliest year in the experience list, e.g. "2019 — now" gives 2019
+const since = Math.min(...about.experience.map((e) => Number(e.years.match(/\d{4}/)?.[0] ?? 9999)));
+
+// Up to three images from each featured project become cards on the ring.
+const ring = featured.flatMap((w) =>
+  [src(w.cover, 1200), src(w.inlineImage, 1200), ...w.gallery.map((g: any) => src(g, 1200))]
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((img) => ({ img, title: w.title, href: `/work/${w.slug}/` }))
+);
+// Sentence case, keeping short tokens like "ux" and "3d" as acronyms
+const cap = (s: string) =>
+  s.split(' ').map((t, i) => (t.length <= 2 ? t.toUpperCase() : i ? t : t[0].toUpperCase() + t.slice(1))).join(' ');
 ---
 <Base>
-  <!-- ── Hero: the keyring ───────────────────────── -->
+  <!-- ── Hero ───────────────────────────────────── -->
   <section class="hero" aria-labelledby="hero-title">
-    <canvas class="keyring" aria-hidden="true"></canvas>
-    <script type="application/json" id="charms" set:html={JSON.stringify(charms)}></script>
-
-    <div class="hero-side wrap">
-      <p>{site.role}<br />{site.location}</p>
-      <p class="status"><span class="led" aria-hidden="true"></span>hello world, systems online</p>
+    <div class="hero-bg" aria-hidden="true">
+      <canvas class="halftone"></canvas>
+      <div class="grain"></div>
     </div>
-
-    <p class="hover-caption" aria-hidden="true"></p>
-
-    <div class="hero-foot wrap">
-      <h1 id="hero-title" class="display headline">
-        <span class="line">design led by</span>
-        <span class="line cycle" data-words={JSON.stringify(home.heroWords)}>{home.heroWords[0]}</span>
+    <div class="hero-main wrap">
+      <h1 id="hero-title" class="headline">
+        {site.role}, based in {site.location.split(',')[0]}. <span class="sheen">Design led by <span class="nowrap"><span class="cycle" data-words={JSON.stringify(home.heroWords)}><span>{home.heroWords[0]}</span></span>.</span></span>
       </h1>
-      <nav class="ring-list" aria-label="Projects on the keyring">
-        <p class="dot">on the ring</p>
-        <ul>
-          {charms.map((c, i) => (
-            <li><a href={c.href} data-charm={i} class="sweep">{c.title.toLowerCase()}</a></li>
+      <div class="hero-cta">
+        <div class="stat">
+          <p>Designing since</p>
+          <p class="stat-num"><span>{since}</span><span class="unit">/{site.location.split(',')[0]}</span></p>
+        </div>
+        <div class="buttons">
+          <Button variant="accent" href="#work" sub={`${work.length} case studies`}>View my work</Button>
+          <Button href="/contact">Get in touch</Button>
+        </div>
+      </div>
+    </div>
+    <div class="hero-foot wrap">
+      <hr class="rule" />
+      <p class="giant wordmark" aria-label="jjuncreative">{'JJUNCREATIVE'.split('').map((ch) => <span class="ch" aria-hidden="true">{ch}</span>)}</p>
+      <hr class="rule" />
+    </div>
+  </section>
+
+  <!-- ── What I do: bento ───────────────────────── -->
+  <section class="bento wrap" aria-labelledby="bento-title">
+    <article class="intro card" data-reveal>
+      <div>
+        {portrait && <img class="avatar" src={portrait} alt="Junjie" width="56" height="56" />}
+        <h2 id="bento-title" class="h3">Hi, I'm Junjie. <span class="mute">I design products people enjoy using.</span></h2>
+        <p class="blurb">{home.aboutBlurb}</p>
+      </div>
+      <Button href="/about">More about me</Button>
+    </article>
+    <ul class="skills">
+      {home.doesWords.map((w, i) => (
+        <li class="skill card has-art" data-reveal style={`transition-delay:${(i % 3) * 80}ms`}>
+          <div class="skill-copy">
+            <h3>{cap(w)}</h3>
+            <span class="num">{String(i + 1).padStart(2, '0')}.</span>
+          </div>
+          <div class="art"><DotArt variant={i} /></div>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <!-- ── Featured: images orbit the headline ────── -->
+  {ring.length > 0 && (
+    <section class="orbit" id="work" aria-labelledby="orbit-title">
+      <div class="orbit-stage">
+        <h2 id="orbit-title" class="h1 orbit-title">Selected work. <span class="mute">Made with care.</span></h2>
+        <ul class="orbit-ring" aria-hidden="true">
+          {ring.map((c, i) => (
+            <li class="o-card" style={`--i:${i}`}>
+              <a href={c.href} data-cursor="view" tabindex="-1">
+                <img src={c.img} alt="" loading="lazy" />
+                <span class="o-cap">{c.title}</span>
+              </a>
+            </li>
           ))}
         </ul>
+      </div>
+      <nav class="orbit-links wrap" aria-label="Featured projects">
+        {featured.map((w) => <a href={`/work/${w.slug}/`} class="tag">{w.title} ↗</a>)}
       </nav>
-    </div>
-  </section>
-
-  <!-- ── Marquee ─────────────────────────────────── -->
-  <div class="marquee" aria-hidden="true">
-    <div class="marquee-track display">
-      {Array.from({ length: 6 }).map(() => <span>{marquee} <i>⬩</i></span>)}
-    </div>
-  </div>
-
-  <!-- ── About, pinned ───────────────────────────── -->
-  <section class="does" aria-labelledby="does-title" style={`--count:${home.doesWords.length}`}>
-    <div class="does-pin wrap">
-      <p class="dot">about</p>
-      <h2 id="does-title" class="display does-title">
-        junjie does
-        <span class="does-word" aria-live="off">
-          <span class="br" aria-hidden="true">&lt;</span>
-          <span class="does-text">{home.doesWords[0]}</span>
-          <span class="br" aria-hidden="true">&gt;</span>
-        </span>
-      </h2>
-      <span class="visually-hidden">{home.doesWords.join(', ')}</span>
-      <div class="does-body">
-        <p class="blurb">{home.aboutBlurb}</p>
-        <p class="coords">currently in {site.location}<br /><span>{site.coordinates}</span></p>
-        <a href="/about" class="sweep">more about me</a>
-      </div>
-      <ol class="does-ticks" aria-hidden="true">
-        {home.doesWords.map((w) => <li>{w}</li>)}
-      </ol>
-    </div>
-  </section>
-
-  <!-- ── Featured, horizontal ────────────────────── -->
-  <section class="featured" aria-labelledby="featured-title">
-    <div class="featured-track">
-      <div class="panel intro wrap">
-        <p class="dot">featured work</p>
-        <h2 id="featured-title" class="display">a few things<br />i'm proud of</h2>
-        <a href="/work" class="sweep">see all work</a>
-      </div>
-      {featured.map((w, i) => {
-        const imgs = [src(w.cover, 1600), src(w.inlineImage, 1200), src(w.gallery[0], 1200)].filter(Boolean);
-        return (
-          <article class="panel project" style={`--accent:${w.charm.color}`}>
-            <div class="info">
-              <p class="count">{i + 1} of {featured.length}</p>
-              <h3 class="display">{w.title}</h3>
-              <p class="meta">{w.year}, {w.category}</p>
-              <p class="summary">{w.summary}</p>
-              <ul class="tags">{w.tools.map((t) => <li>{t}</li>)}</ul>
-              <a href={`/work/${w.slug}/`} class="sweep">view project</a>
-            </div>
-            <a href={`/work/${w.slug}/`} class="collage" data-cursor="view" tabindex="-1" aria-hidden="true">
-              {imgs.map((s, j) => <figure class={`c c${j}`}><img src={s} alt="" loading="lazy" /></figure>)}
-            </a>
-          </article>
-        );
-      })}
-    </div>
-  </section>
+    </section>
+  )}
 
   <!-- ── All work ───────────────────────────────── -->
   <WorkIndex work={work} />
@@ -113,95 +110,120 @@ const marquee = home.marquee || `select projects, ${Math.min(...years)} to now`;
 
 <style>
   /* Hero */
-  .hero { position: relative; height: 100svh; min-height: 620px; overflow: hidden; }
-  .keyring { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: pan-y; }
-  .hero-side {
-    position: absolute; top: 5.5rem; right: 0; text-align: right;
-    font-size: var(--step--1); color: var(--steel); pointer-events: none;
+  .hero {
+    position: relative; height: 100svh; min-height: 640px; overflow: hidden;
+    display: flex; flex-direction: column;
+    background: #5e5e5e;
   }
-  .status { display: inline-flex; align-items: center; gap: 0.5rem; }
-  .led { width: 7px; height: 7px; border-radius: 50%; background: var(--signal); animation: blink 2.4s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0.2; } }
-  .hover-caption {
-    position: absolute; left: 50%; top: 58%; translate: -50% 0; margin: 0;
-    font-size: var(--step--1); padding: 0.3rem 0.7rem; border-radius: 99px;
-    background: var(--graphite); color: var(--chalk);
-    opacity: 0; transition: opacity 0.25s; pointer-events: none;
+  .hero-bg { position: absolute; inset: 0; }
+  .hero-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(70% 90% at 78% 18%, #7a7a7a 0%, transparent 70%),
+      radial-gradient(80% 80% at 10% 100%, #3e3e3e 0%, transparent 70%);
   }
-  .hover-caption.on { opacity: 1; }
-  .hero-foot {
-    position: absolute; inset: auto 0 0; padding-bottom: clamp(1.5rem, 4vw, 3rem);
-    display: flex; justify-content: space-between; align-items: end; gap: 2rem; flex-wrap: wrap;
-    pointer-events: none;
+  .halftone { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .grain {
+    position: absolute; inset: 0; opacity: 0.09; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+    background-size: 160px 160px;
   }
-  .hero-foot a { pointer-events: auto; }
-  .headline { font-size: var(--step-4); }
-  .headline .line { display: block; overflow: hidden; padding-bottom: 0.08em; }
-  .headline .cycle { color: var(--signal); min-height: 1.1em; }
-  .ring-list { font-size: var(--step--1); }
-  .ring-list ul { list-style: none; margin: 0.4rem 0 0; padding: 0; display: grid; gap: 0.15rem; }
-
-  /* Marquee */
-  .marquee { border-block: 1px solid #1b1d2026; overflow: hidden; padding-block: 1.2rem; }
-  .marquee-track { display: flex; width: max-content; font-size: var(--step-3); white-space: nowrap; }
-  .marquee-track span { padding-right: 0.6em; }
-  .marquee-track i { font-style: normal; color: var(--signal); }
-
-  /* Does */
-  .does { height: calc(var(--count) * 70svh + 100svh); position: relative; }
-  .does-pin {
-    position: sticky; top: 0; height: 100svh;
-    display: grid; grid-template-columns: 1.4fr 1fr; grid-template-rows: auto 1fr auto;
-    gap: 1.5rem 3rem; padding-block: 6rem 2.5rem; align-content: center;
+  .hero-main {
+    position: relative; flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+    padding-top: 6.5rem; padding-bottom: 2.6rem; pointer-events: none; color: #fff;
   }
-  .does-pin > .dot { grid-column: 1 / -1; }
-  .does-title { font-size: var(--step-3); align-self: center; }
-  .does-word { display: block; margin-top: 0.5rem; color: var(--signal); white-space: nowrap; }
-  .does-word .br { color: var(--steel); }
-  .does-text { display: inline-block; }
-  .does-body { align-self: center; }
-  .blurb { font-size: var(--step-1); line-height: 1.4; }
-  .coords { color: var(--steel); font-size: var(--step--1); }
-  .coords span { font-variant-numeric: tabular-nums; }
-  .does-ticks {
-    grid-column: 1 / -1; list-style: none; margin: 0; padding: 0;
-    display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; font-size: var(--step--1); color: var(--steel);
+  .hero-main :global(a), .hero-main :global(button) { pointer-events: auto; }
+  .headline {
+    grid-column: 2; align-self: start; justify-self: end; margin-top: 18vh; width: min(100%, 15.5em);
+    font-size: clamp(1.9rem, 1.2rem + 1.6vw, 3rem); letter-spacing: -0.05em; line-height: 1;
+    text-wrap: balance;
   }
-  .does-ticks li { transition: color 0.3s; }
-  .does-ticks li.on { color: var(--graphite); }
+  /* Slow light sweep across the second line */
+  .sheen {
+    background: linear-gradient(100deg, #c6c6c6 40%, #dedede 46%, #fff 50%, #dedede 54%, #c6c6c6 60%) 0 0 / 300% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: sheen 3.8s linear infinite;
+  }
+  @keyframes sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
+  .nowrap { white-space: nowrap; }
+  .cycle { display: inline-flex; overflow: hidden; vertical-align: bottom; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+  .cycle > span { display: inline-block; }
+  .hero-cta { grid-column: 1; grid-row: 1; align-self: end; }
+  .stat p { margin: 0; }
+  .stat > p:first-child { font-size: 1rem; margin-bottom: 0.2rem; }
+  .stat-num { display: flex; align-items: baseline; gap: 0.35rem; font-size: clamp(3rem, 2rem + 2.6vw, 4.5rem); letter-spacing: -0.06em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat-num .unit { font-size: clamp(1.5rem, 1.1rem + 1vw, 2.25rem); letter-spacing: -0.05em; opacity: 0.55; }
+  .buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.1rem; }
+  .hero-foot { position: relative; color: #fff; }
+  .hero-foot .rule { border-color: #ffffff38; }
+  .wordmark { font-weight: 400; padding-block: 0.12em 0.06em; overflow: hidden; }
+  .wordmark .ch { display: inline-block; }
+  @media (prefers-reduced-motion: reduce) { .sheen { animation: none; } }
   @media (max-width: 760px) {
-    .does-pin { grid-template-columns: 1fr; }
-    .does-word { white-space: normal; }
+    .hero-main { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; padding-top: 5.5rem; }
+    .headline { grid-column: 1; grid-row: 1; justify-self: start; margin-top: 0; width: auto; }
+    .hero-cta { grid-row: 3; }
   }
 
-  /* Featured horizontal */
-  .featured { overflow: hidden; background: var(--dial-deep); }
-  .featured-track { display: flex; width: max-content; height: 100svh; }
-  .panel { height: 100%; flex: none; }
-  .intro { width: min(48vw, 640px); display: flex; flex-direction: column; justify-content: center; gap: 1.2rem; }
-  .intro h2 { font-size: var(--step-3); }
-  .project {
-    width: 100vw; display: grid; grid-template-columns: minmax(280px, 0.8fr) 1.6fr;
-    gap: 3rem; padding: 6rem var(--gutter) 3rem; align-items: center;
-    border-left: 1px solid #1b1d201f;
+  /* Bento */
+  .bento {
+    display: grid; grid-template-columns: minmax(280px, 1fr) 2.2fr; gap: 0.75rem;
+    padding-top: clamp(1rem, 3vw, 2rem);
   }
-  .info h3 { font-size: var(--step-2); margin: 0.5rem 0; overflow-wrap: anywhere; }
-  .count, .meta { color: var(--steel); font-size: var(--step--1); margin: 0; }
-  .count::before { content: ''; display: inline-block; width: 0.6rem; height: 0.6rem; margin-right: 0.5rem; background: var(--accent); transform: rotate(45deg); }
-  .summary { margin: 1.2rem 0; max-width: 40ch; }
-  .tags { list-style: none; padding: 0; margin: 0 0 1.5rem; display: flex; flex-wrap: wrap; gap: 0.4rem; }
-  .tags li { font-size: var(--step--1); border: 1px solid #1b1d2033; border-radius: 99px; padding: 0.1rem 0.7rem; }
-  .collage { position: relative; height: min(70svh, 640px); display: block; }
-  .c { position: absolute; margin: 0; overflow: hidden; border-radius: 6px; background: var(--dial); box-shadow: 0 30px 60px -30px #1b1d2055; }
-  .c img { width: 100%; height: 100%; object-fit: cover; scale: 1.15; }
-  .c0 { inset: 0 18% 22% 0; }
-  .c1 { width: 38%; aspect-ratio: 4 / 3; right: 0; top: 8%; }
-  .c2 { width: 46%; aspect-ratio: 16 / 9; right: 6%; bottom: 0; }
+  .intro { padding: 1.6rem; display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; }
+  .avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; margin-bottom: 1.2rem; border: 2px solid var(--panel-2); }
+  .intro h2 { margin-bottom: 1rem; }
+  .blurb { color: var(--mute); font-size: var(--step--1); }
+  .skills { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+  .skill {
+    padding: 1.2rem; display: grid; grid-template-columns: 1fr 1.25fr; gap: 1rem; min-height: 11rem;
+    transition: border-color 0.35s, background-color 0.35s;
+  }
+  .skill:hover { border-color: #ffffff26; background: #232323; }
+  .skill-copy { display: flex; flex-direction: column; justify-content: space-between; }
+  .skill h3 { font-size: 1rem; letter-spacing: -0.03em; }
+  .art { background: #181818; border: 1px solid var(--line); border-radius: 14px; padding: 0.8rem; display: grid; align-items: center; }
+  @media (max-width: 1100px) {
+    .bento { grid-template-columns: 1fr; }
+    .skills { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 560px) {
+    .skill { grid-template-columns: 1fr; min-height: 0; padding: 0.9rem; }
+    .skill-copy { gap: 0.3rem; }
+  }
 
-  @media (max-width: 860px) {
-    .featured-track { flex-direction: column; width: auto; height: auto; }
-    .intro { width: auto; padding-block: 5rem 2rem; }
-    .project { width: auto; grid-template-columns: 1fr; padding-block: 3rem; border-left: 0; border-top: 1px solid #1b1d201f; }
-    .collage { height: 60vw; }
+  /* Orbit */
+  .orbit { position: relative; height: 420svh; margin-top: clamp(4rem, 9vw, 8rem); }
+  .orbit-stage {
+    position: sticky; top: 0; height: 100svh; overflow: hidden;
+    display: grid; place-items: center; perspective: 1400px;
+    background: radial-gradient(60% 55% at 50% 50%, #2c2c2c, transparent 75%);
   }
+  .orbit-title { position: relative; z-index: 200; text-shadow: 0 2px 30px #000a; text-align: center; max-width: 11ch; pointer-events: none; }
+  .orbit-ring { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; transform-style: preserve-3d; }
+  .o-card {
+    position: absolute; left: 50%; top: 50%;
+    width: clamp(220px, 24vw, 400px); aspect-ratio: 16 / 10;
+    margin: calc(clamp(220px, 24vw, 400px) * -0.3125) 0 0 calc(clamp(220px, 24vw, 400px) * -0.5);
+    will-change: transform, opacity;
+  }
+  .o-card a { display: block; width: 100%; height: 100%; border-radius: 14px; overflow: hidden; background: var(--panel); box-shadow: 0 40px 80px -30px #000; }
+  .o-card img { width: 100%; height: 100%; object-fit: cover; }
+  .o-cap {
+    position: absolute; left: 0.7rem; bottom: 0.7rem; font-size: 0.75rem; padding: 0.25rem 0.6rem;
+    border-radius: 99px; background: #141414cc; backdrop-filter: blur(6px);
+  }
+  .orbit-links { position: absolute; bottom: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; padding-bottom: 2rem; }
+  .orbit-links a:hover { color: var(--ink); border-color: #ffffff40; }
+
+  /* Without the scroll animation: a simple swipeable row */
+  :global(html.no-orbit) .orbit { height: auto; }
+  :global(html.no-orbit) .orbit-stage { position: static; height: auto; display: block; perspective: none; background: none; padding-inline: var(--gutter); }
+  :global(html.no-orbit) .orbit-title { text-align: left; margin-bottom: 1.5rem; }
+  :global(html.no-orbit) .orbit-ring {
+    position: static; display: flex; gap: 0.75rem; overflow-x: auto; scroll-snap-type: x mandatory;
+    padding-bottom: 1rem; scrollbar-width: none;
+  }
+  :global(html.no-orbit) .o-card { position: relative; left: auto; top: auto; margin: 0; flex: none; width: min(78vw, 400px); scroll-snap-align: start; }
+  :global(html.no-orbit) .orbit-links { position: static; justify-content: start; padding: 1rem var(--gutter) 0; }
 </style>

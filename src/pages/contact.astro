@@ -1,13 +1,25 @@
 ---
 import Base from '../layouts/Base.astro';
+import { getSite } from '../lib/content';
+const site = await getSite();
 ---
 <Base title="Contact">
-  <section class="wrap spacer">
-    <p class="dot">contact</p>
-    <h1 class="display">let's make something</h1>
+  <section class="wrap head">
+    <p class="label">Contact</p>
+    <h1 class="h1">Let's talk. <span class="mute">{site.availability}</span></h1>
+    <ul class="details">
+      <li class="card"><span class="label">Email</span><a href={`mailto:${site.email}`} class="sweep">{site.email}</a></li>
+      <li class="card"><span class="label">Based in</span><span>{site.location}</span></li>
+      <li class="card"><span class="label">Elsewhere</span><span class="links">{site.socials.map((s: any) => <a href={s.url} target="_blank" rel="noopener" class="sweep">{s.label}</a>)}</span></li>
+    </ul>
   </section>
 </Base>
 <style>
-  .spacer { padding-block: clamp(8rem, 16vw, 12rem) 2rem; }
-  h1 { font-size: var(--step-4); margin-top: 1rem; }
+  .head { padding-top: clamp(8rem, 16vw, 12rem); }
+  h1 { max-width: 18ch; }
+  .details { list-style: none; margin: clamp(2.5rem, 5vw, 4rem) 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
+  .details li { padding: 1.2rem 1.4rem; display: grid; gap: 0.4rem; }
+  .details .label { margin: 0; }
+  .links { display: flex; gap: 1rem; flex-wrap: wrap; }
+  @media (max-width: 760px) { .details { grid-template-columns: 1fr; } }
 </style>

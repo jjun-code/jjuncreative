@@ -1,0 +1,75 @@
+---
+// Small dot-matrix illustration for a card. Pattern is picked by `variant`
+// and generated at build time, so each card gets a stable, distinct graphic.
+interface Props { variant: number }
+const { variant } = Astro.props;
+const COLS = 21, ROWS = 11, GAP = 8;
+
+// Deterministic noise so builds are stable
+const rand = (n: number) => {
+  const x = Math.sin(n * 127.1 + variant * 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+const lit = (c: number, r: number): number => {
+  const y = ROWS - 1 - r; // 0 at the bottom
+  switch (variant % 6) {
+    case 0: { // rising bars
+      if (c % 3) return 0;
+      const hgt = Math.round(2 + (c / COLS) * 7 + rand(c) * 2);
+      return y < hgt ? (y === hgt - 1 ? 1 : 0.55) : 0;
+    }
+    case 1: { // grid of clusters with a couple of filled cells
+      const inCell = c % 4 !== 3 && r % 4 !== 3;
+      if (!inCell) return 0;
+      const cell = Math.floor(c / 4) + Math.floor(r / 4) * 6;
+      return cell === 7 || cell === 15 ? 1 : 0.35;
+    }
+    case 2: { // wave
+      const wave = 5 + Math.sin(c * 0.55) * 3.4;
+      const d = Math.abs(y - wave);
+      return d < 0.6 ? 1 : d < 1.6 ? 0.4 : 0;
+    }
+    case 3: { // bars converging on a tall column
+      if (c === 17) return 1;
+      if (c > 17) return r === 5 ? 0.6 : 0;
+      if (c % 2) return 0;
+      return Math.abs(r - 5) <= 2 ? 0.75 : 0;
+    }
+    case 4: { // rings
+      const d = Math.hypot((c - 10) * 0.9, r - 5);
+      const ring = Math.abs(d - Math.round(d / 2.6) * 2.6);
+      return d < 6.6 && ring < 0.45 ? (d < 1 ? 1 : 0.7) : 0;
+    }
+    default: { // diagonal scatter
+      const p = (c + (ROWS - r) * 1.6) / (COLS + ROWS * 1.6);
+      return rand(c * 31 + r) < p * 0.9 ? (rand(c + r * 7) > 0.7 ? 1 : 0.45) : 0;
+    }
+  }
+};
+
+const dots = [];
+for (let r = 0; r < ROWS; r++)
+  for (let c = 0; c < COLS; c++) dots.push({ c, r, a: lit(c, r) });
+---
+<svg class="dotart" viewBox={`0 0 ${COLS * GAP} ${ROWS * GAP}`} aria-hidden="true">
+  {dots.map(({ c, r, a }) => (
+    <rect
+      x={c * GAP + 2.5} y={r * GAP + 2.5} width="3" height="3" rx="0.6"
+      class={a ? (a === 1 ? 'hi' : 'on') : undefined}
+      style={a && a < 1 ? `--a:${a};--d:${((c * 37 + r * 11) % 23) * 60}ms` : a ? `--d:${((c * 37 + r * 11) % 23) * 60}ms` : undefined}
+    />
+  ))}
+</svg>
+
+<style>
+  .dotart { width: 100%; height: auto; display: block; }
+  rect { fill: #ffffff14; }
+  .on { fill: #fff; opacity: var(--a); }
+  .hi { fill: #fff; }
+  :global(.has-art:hover) .on, :global(.has-art:hover) .hi { animation: twinkle 1.4s var(--d) ease-in-out infinite; }
+  @keyframes twinkle { 50% { opacity: 0.15; } }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.has-art:hover) .on, :global(.has-art:hover) .hi { animation: none; }
+  }
+</style>

@@ -6,12 +6,12 @@ const work = await getWork();
 ---
 <Base title="Work">
   <header class="wrap head">
-    <p class="dot">work</p>
-    <h1 class="display">everything on the ring</h1>
+    <p class="label">Work</p>
+    <h1 class="h1">Every project. <span class="mute">Start to finish.</span></h1>
   </header>
   <WorkIndex work={work} heading={false} />
 </Base>
 <style>
-  .head { padding-top: clamp(7rem, 14vw, 11rem); }
-  h1 { font-size: var(--step-4); margin-top: 1rem; }
+  .head { padding-top: clamp(8rem, 16vw, 12rem); }
+  h1 { max-width: 12ch; }
 </style>
