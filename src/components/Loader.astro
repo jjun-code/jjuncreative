@@ -81,6 +81,11 @@ const year = new Date().getFullYear();
       .map(([, m]: readonly [number, string]) => m);
     if (names.length) name.textContent = names[0];
 
+    // ── Veil: the page colour, dissolved in a dither sweep (scripts/veil.ts) ──
+    // Set up before the progress loop starts, so the exit can always use it
+    const { draw: dissolve } = makeVeil(veil, { from: 'bottom-left' });
+    dissolve(0);
+
     // ── Progress: real loading, but never faster than MIN or slower than MAX ──
     const MIN = 1700, MAX = 4500, t0 = performance.now();
     const imgs = [...document.images].filter((i) => i.loading !== 'lazy');
@@ -122,9 +127,6 @@ const year = new Date().getFullYear();
       tl.to(p, { t: 1, duration: 1, ease: 'power2.inOut', onUpdate: () => dissolve(p.t) }, 0.7);
     }
 
-    // ── Veil: the page colour, dissolved in a dither sweep (scripts/veil.ts) ──
-    const { draw: dissolve } = makeVeil(veil, { from: 'bottom-left' });
-    dissolve(0);
   }
 </script>
 

@@ -44,7 +44,7 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="preload" href="/fonts/OverusedGrotesk-VF.ttf" as="font" type="font/ttf" crossorigin />
-    <!-- Pages swap without a full reload, so the background music never stops -->
+    <!-- Pages swap without a full reload; the backdrop, cursor and trail carry over -->
     <ClientRouter />
   </head>
   <body>
@@ -57,6 +57,7 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
       <slot />
     </main>
     {footer && <Footer site={site} cta={footerCta} />}
+    <canvas class="trail" aria-hidden="true" transition:persist="trail"></canvas>
     <div class="cursor" aria-hidden="true" transition:persist="cursor"><span>view</span></div>
     <script>
       import { initSmooth } from '../scripts/smooth';
@@ -64,12 +65,14 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
       import { initReveal } from '../scripts/reveal';
       import { initBackdrop } from '../scripts/backdrop';
       import { initCoords } from '../scripts/coords';
+      import { initTrail } from '../scripts/trail';
       import { onPage } from '../scripts/page';
       // These live outside the swapped page content, so they start once
       initSmooth();
       initBackdrop();
       initCoords();
       initCursor();
+      initTrail();
       onPage(initReveal);
 
       // The incoming page arrives without the theme the head script set on

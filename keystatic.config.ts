@@ -66,7 +66,7 @@ export default config({
             }),
             onKeyring: fields.checkbox({ label: 'Hang on the home page keyring', defaultValue: true }),
           },
-          { label: 'Project colour', description: 'Shows behind its tile and thumbnail, and tints the top of the project page. Shape and keyring are no longer shown on the site.' }
+          { label: 'Project colour', description: 'Shows behind its card and thumbnail while the image loads. Shape and keyring are no longer shown on the site.' }
         ),
 
         cover: fields.object(imageWithFallback('Cover image', 'public/images/work', '/images/work/'), {
