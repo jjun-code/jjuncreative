@@ -42,7 +42,7 @@
   --cols: 4;              /* layout grid columns; drawn by .site-grid */
   --pad: clamp(0.6rem, 0.4rem + 0.5vw, 1rem); /* content inset from a grid line */
   --grid-line: #ffffff12;
-  --radius: clamp(18px, 1.2rem + 0.5vw, 28px);
+  --radius: 8px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   color-scheme: dark;
 }
