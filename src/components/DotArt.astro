@@ -64,9 +64,9 @@ for (let r = 0; r < ROWS; r++)
 
 <style>
   .dotart { width: 100%; height: auto; display: block; }
-  rect { fill: #ffffff14; }
-  .on { fill: #fff; opacity: var(--a); }
-  .hi { fill: #fff; }
+  rect { fill: var(--line); }
+  .on { fill: var(--ink); opacity: var(--a); }
+  .hi { fill: var(--ink); }
   :global(.has-art:hover) .on, :global(.has-art:hover) .hi { animation: twinkle 1.4s var(--d) ease-in-out infinite; }
   @keyframes twinkle { 50% { opacity: 0.15; } }
   @media (prefers-reduced-motion: reduce) {

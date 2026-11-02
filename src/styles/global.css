@@ -13,14 +13,24 @@
   --bg: #141414;          /* page */
   --panel: #1f1f1f;       /* cards */
   --panel-2: #2a2a2a;     /* cards inside cards, buttons */
+  --hover: #232323;       /* card hover */
+  --well: #181818;        /* sunken area inside a card */
   --line: #ffffff14;      /* hairlines and card borders */
+  --line-strong: #ffffff30;
+  --glass: #262626e6;     /* floating nav buttons */
   --ink: #f3f3f3;         /* text */
+  --body: #cfcfcf;        /* long-form copy */
   --mute: #8d8d8d;        /* second line of headlines, secondary text */
   --dim: #5e5e5e;         /* labels, numbers */
-  --accent: #ff4d00;      /* main button, menu, highlights */
-  --accent-ink: #fff;
+  --inverse: #ffffff;     /* button hover fill */
+  --inverse-ink: #141414;
+  --accent: #8cff00;      /* main button, menu, highlights */
+  --accent-ink: #141414;  /* text on the accent */
+  --accent-text: var(--accent); /* accent used as text on the page */
+  --dither: 255, 255, 255; /* background pixel colour, as r, g, b */
 
   --font: 'Overused Grotesk', 'Helvetica Neue', Arial, sans-serif;
+  --font-display: var(--font); /* headings; swap for a display face if wanted */
 
   --step--1: clamp(0.8rem, 0.78rem + 0.1vw, 0.875rem);
   --step-0: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
@@ -29,9 +39,34 @@
   --step-3: clamp(2.4rem, 1.6rem + 3.4vw, 4.75rem);
 
   --gutter: clamp(1rem, 0.6rem + 1.6vw, 2.25rem);
+  --cols: 4;              /* layout grid columns; drawn by .site-grid */
+  --pad: clamp(0.6rem, 0.4rem + 0.5vw, 1rem); /* content inset from a grid line */
+  --grid-line: #ffffff12;
   --radius: clamp(18px, 1.2rem + 0.5vw, 28px);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   color-scheme: dark;
+}
+
+/* Light theme: set by the toggle in the nav, or the visitor's system setting */
+:root[data-theme='light'] {
+  --bg: #f1f1ef;
+  --panel: #ffffff;
+  --panel-2: #e9e9e6;
+  --hover: #fafaf8;
+  --well: #f4f4f2;
+  --line: #0000001a;
+  --line-strong: #00000033;
+  --glass: #ffffffe6;
+  --ink: #141414;
+  --body: #3d3d3d;
+  --mute: #707070;
+  --dim: #9d9d9d;
+  --inverse: #141414;
+  --inverse-ink: #ffffff;
+  --accent-text: #3f7d00; /* lime is too light to read on a light page */
+  --dither: 20, 20, 20;
+  --grid-line: #00000012;
+  color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -42,10 +77,7 @@ html.lenis, html.lenis body { height: auto; }
 body {
   margin: 0;
   background-color: var(--bg);
-  /* Fine dot grid, as on a halftone screen */
-  background-image: radial-gradient(#ffffff0f 0.8px, transparent 1.1px);
-  background-size: 6px 6px;
-  background-attachment: fixed;
+  transition: background-color 0.4s, color 0.4s;
   color: var(--ink);
   font-family: var(--font);
   font-size: var(--step-0);
@@ -59,7 +91,7 @@ body {
 img { display: block; max-width: 100%; height: auto; }
 a { color: inherit; text-decoration: none; }
 p { margin: 0 0 1em; max-width: 60ch; }
-h1, h2, h3, h4 { margin: 0; font-weight: 500; }
+h1, h2, h3, h4 { margin: 0; font-family: var(--font-display); font-weight: 500; }
 button { font: inherit; letter-spacing: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
@@ -68,7 +100,7 @@ button { font: inherit; letter-spacing: inherit; color: inherit; background: non
 .wrap { padding-inline: var(--gutter); }
 
 /* Headlines: tight, two-tone. Wrap the second phrase in .mute */
-.h1, .h2, .h3 { letter-spacing: -0.05em; line-height: 1; }
+.h1, .h2, .h3, .display { font-family: var(--font-display); font-weight: 500; letter-spacing: -0.05em; line-height: 1; }
 .h1 { font-size: var(--step-3); }
 .h2 { font-size: var(--step-2); }
 .h3 { font-size: var(--step-1); letter-spacing: -0.04em; line-height: 1.1; }
@@ -77,6 +109,69 @@ button { font: inherit; letter-spacing: inherit; color: inherit; background: non
 /* Small label above a section */
 .label { font-size: var(--step--1); color: var(--mute); letter-spacing: -0.01em; margin: 0 0 1rem; }
 .num { font-size: 0.75rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+
+/* Small monospaced label, used for file-like captions */
+.mono {
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.72rem; font-weight: 400; letter-spacing: 0.02em; line-height: 1.7; text-transform: uppercase;
+}
+
+/* Animated pixel field, fixed behind every page (scripts/pixels.ts) */
+.backdrop { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; opacity: 0.5; pointer-events: none; }
+
+/* ── Layout grid ───────────────────────────────
+   .site-grid draws the column lines behind every page. Put sections on .grid
+   and their children on the same columns, so content sits just inside a line.
+   Spans: .c-1 to .c-4 (columns), .c-full, .c-last3; .sub makes a child a subgrid. */
+@media (max-width: 760px) { :root { --cols: 2; } }
+
+.site-grid {
+  position: fixed; z-index: -1; top: 0; bottom: 0; left: var(--gutter); right: var(--gutter);
+  pointer-events: none;
+  border-right: 1px solid var(--grid-line);
+  background: linear-gradient(to right, var(--grid-line) 1px, transparent 1px) 0 0 / calc(100% / var(--cols)) 100%;
+}
+/* Rule under the header, with a small cross where each column line meets it */
+.site-grid::before {
+  content: ''; position: absolute; top: 5.5rem; left: calc(var(--gutter) * -1); right: calc(var(--gutter) * -1);
+  height: 1px; background: var(--grid-line);
+}
+.site-grid i {
+  position: absolute; top: calc(5.5rem - 5px); width: 11px; height: 11px; margin-left: -5px;
+  background:
+    linear-gradient(var(--mute), var(--mute)) center / 1px 100% no-repeat,
+    linear-gradient(var(--mute), var(--mute)) center / 100% 1px no-repeat;
+  opacity: 0.5;
+}
+.site-grid i:nth-child(1) { left: 0; }
+.site-grid i:nth-child(2) { left: 25%; }
+.site-grid i:nth-child(3) { left: 50%; }
+.site-grid i:nth-child(4) { left: 75%; }
+.site-grid i:nth-child(5) { left: 100%; }
+@media (max-width: 760px) { .site-grid i:nth-child(2), .site-grid i:nth-child(4) { display: none; } }
+
+/* Cursor coordinates, tucked under the header rule at the grid's top-right
+   corner (scripts/coords.ts). Desktop with a mouse only. */
+.coords {
+  position: fixed; z-index: 40; top: calc(5.5rem + 0.6rem); right: calc(var(--gutter) + var(--pad));
+  margin: 0; color: var(--mute); font-variant-numeric: tabular-nums; pointer-events: none;
+  opacity: 0; transition: opacity 0.4s;
+}
+.coords.on { opacity: 1; }
+@media (max-width: 760px), (hover: none), (pointer: coarse) { .coords { display: none; } }
+
+.grid { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); padding-inline: var(--gutter); }
+.grid > *, .sub > * { padding-inline: var(--pad); min-width: 0; }
+.sub { display: grid; grid-template-columns: subgrid; padding-inline: 0 !important; }
+.c-1 { grid-column: span 1; }
+.c-2 { grid-column: span 2; }
+.c-3 { grid-column: span 3; }
+.c-4, .c-full { grid-column: 1 / -1; }
+.c-last3 { grid-column: 2 / -1; } /* columns 2 to 4 */
+@media (max-width: 760px) {
+  .c-3 { grid-column: 1 / -1; }
+  .c-last3 { grid-column: 1 / -1; }
+}
 
 /* Rounded panel */
 .card {
@@ -106,13 +201,6 @@ button:hover .roll > span, button:focus-visible .roll > span { transform: transl
 
 /* Pill tag */
 .tag { display: inline-block; font-size: var(--step--1); border: 1px solid var(--line); border-radius: 99px; padding: 0.25rem 0.75rem; color: var(--mute); }
-
-/* Full-width wordmark; scripts/fit.ts sizes it to the container */
-.giant {
-  margin: 0; max-width: none; white-space: nowrap; width: max-content;
-  font-weight: 300; letter-spacing: -0.06em; line-height: 0.78;
-  padding-block: 0.06em 0.02em; translate: -0.04em 0;
-}
 
 /* Reveal on scroll (driven by scripts/reveal.ts) */
 [data-reveal] { opacity: 0; translate: 0 24px; transition: opacity 0.9s var(--ease), translate 0.9s var(--ease); }

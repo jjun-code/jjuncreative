@@ -1,17 +1,69 @@
 ---
 import Base from '../../layouts/Base.astro';
-import WorkIndex from '../../components/WorkIndex.astro';
-import { getWork } from '../../lib/content';
+import { getWork, src } from '../../lib/content';
 const work = await getWork();
+const categories = [...new Set(work.map((w) => w.category).filter(Boolean))];
 ---
 <Base title="Work">
-  <header class="wrap head">
-    <p class="label">Work</p>
-    <h1 class="h1">Every project. <span class="mute">Start to finish.</span></h1>
-  </header>
-  <WorkIndex work={work} heading={false} />
+  <section class="index grid">
+    <h1 class="h1 head c-full">All <span class="mute">work</span></h1>
+
+    <nav class="filters mono c-1" aria-label="Filter by category">
+      <ul>
+        <li><button aria-pressed="true" data-filter="">All work</button></li>
+        {categories.map((c) => <li><button aria-pressed="false" data-filter={c}>{c}</button></li>)}
+      </ul>
+    </nav>
+
+    <ul class="items c-3 sub">
+      {work.map((w) => {
+        const thumb = src(w.cover, 1000) || src(w.inlineImage, 1000) || src(w.gallery[0], 1000);
+        return (
+          <li data-category={w.category}>
+            <a href={`/work/${w.slug}/`} class="item" data-cursor="view">
+              <div class="thumb" style={`--tint:${w.charm.color}`}>{thumb && <img src={thumb} alt="" loading="lazy" />}</div>
+              <p class="mono title">{w.title}</p>
+              <p class="mono cat">{w.category}, {w.year}</p>
+            </a>
+          </li>
+        );
+      })}
+    </ul>
+  </section>
 </Base>
+
+<script>
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+  const items = [...document.querySelectorAll<HTMLElement>('.items > li')];
+  buttons.forEach((btn) => btn.addEventListener('click', () => {
+    const f = btn.dataset.filter;
+    buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+    items.forEach((li) => { li.hidden = !!f && li.dataset.category !== f; });
+  }));
+</script>
+
 <style>
-  .head { padding-top: clamp(8rem, 16vw, 12rem); }
-  h1 { max-width: 12ch; }
+  .index { padding-top: clamp(7rem, 13vw, 10rem); padding-bottom: clamp(3rem, 6vw, 5rem); }
+  .head { margin-bottom: clamp(2.5rem, 5vw, 4rem); }
+
+  .filters { position: sticky; top: 6.5rem; align-self: start; }
+  .filters ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+  .filters button { color: var(--mute); text-transform: inherit; letter-spacing: inherit; transition: color 0.3s; text-align: left; }
+  .filters button::before { content: '→ '; opacity: 0; transition: opacity 0.3s; }
+  .filters button:hover, .filters button[aria-pressed='true'] { color: var(--ink); }
+  .filters button[aria-pressed='true']::before { opacity: 1; }
+
+  .items { list-style: none; margin: 0; row-gap: 2.5rem; }
+  .item { display: block; }
+  .thumb { aspect-ratio: 4 / 3; overflow: hidden; background: var(--tint, var(--panel)); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; transition: scale 0.8s var(--ease); }
+  .item:hover .thumb img { scale: 1.04; }
+  .title { margin: 0.9rem 0 0; color: var(--ink); transition: color 0.3s; }
+  .item:hover .title { color: var(--accent-text); }
+  .cat { margin: 0; color: var(--dim); font-size: 0.65rem; }
+
+  @media (max-width: 760px) {
+    .filters { position: static; grid-column: 1 / -1; margin-bottom: 1.5rem; }
+    .filters ul { display: flex; flex-wrap: wrap; gap: 0.4rem 1.2rem; }
+  }
 </style>

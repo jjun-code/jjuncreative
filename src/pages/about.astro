@@ -9,14 +9,14 @@ const m = a.headline.match(/^(.+?[.,])\s+(.+)$/);
 const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
 ---
 <Base title="About">
-  <section class="wrap intro">
-    <p class="label">About</p>
-    <h1 class="h1">{lead} {rest && <span class="mute">{rest}</span>}</h1>
+  <section class="grid intro">
+    <p class="label c-full">About</p>
+    <h1 class="h1 c-3">{lead} {rest && <span class="mute">{rest}</span>}</h1>
   </section>
 
-  <section class="wrap split">
-    {portrait && <figure class="portrait card" data-reveal><img src={portrait} alt="Portrait of Junjie" /></figure>}
-    <div class="hello card" data-reveal>
+  <section class="grid split">
+    {portrait && <figure class="portrait c-2" data-reveal><div class="card"><img src={portrait} alt="Portrait of Junjie" /></div></figure>}
+    <div class="hello c-2" data-reveal>
       <p class="h3">{a.hello}</p>
       <dl class="stats">
         {a.stats.map((s, i) => (
@@ -29,35 +29,37 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
     </div>
   </section>
 
-  <section class="wrap block" aria-labelledby="exp-title">
-    <h2 id="exp-title" class="h2" data-reveal>Experience. <span class="mute">Where I've been.</span></h2>
-    <ol class="exp">
+  <section class="grid block" aria-labelledby="exp-title">
+    <h2 id="exp-title" class="h2 c-full" data-reveal>Experience. <span class="mute">Where I've been.</span></h2>
+    <ol class="exp c-full sub">
       {a.experience.map((e) => (
-        <li class="card" data-reveal>
+        <li class="c-full sub" data-reveal>
           <span class="years">{e.years}</span>
           <span class="co h3">{e.company}</span>
-          <span class="role">{e.role}<br /><span>{e.note}</span></span>
+          <span class="role c-2">{e.role}<br /><span>{e.note}</span></span>
         </li>
       ))}
     </ol>
   </section>
 
-  <section class="wrap block" aria-labelledby="kit-title">
-    <h2 id="kit-title" class="h2" data-reveal>Toolkit. <span class="mute">What I use every day.</span></h2>
-    <ul class="kit">
+  <section class="grid block" aria-labelledby="kit-title">
+    <h2 id="kit-title" class="h2 c-full" data-reveal>Toolkit. <span class="mute">What I use every day.</span></h2>
+    <ul class="kit c-full sub">
       {a.toolkit.map((t, i) => (
-        <li class="card has-art" data-reveal>
-          <div class="art"><DotArt variant={i} /></div>
-          <strong>{t.name}</strong>
-          <span>{t.use}</span>
+        <li data-reveal>
+          <div class="tool card has-art">
+            <div class="art"><DotArt variant={i} /></div>
+            <strong>{t.name}</strong>
+            <span>{t.use}</span>
+          </div>
         </li>
       ))}
     </ul>
   </section>
 
-  <section class="wrap block" aria-labelledby="curios-title">
-    <h2 id="curios-title" class="h2" data-reveal>Off the clock. <span class="mute">Things I collect.</span></h2>
-    <ul class="curios" data-reveal>
+  <section class="grid block" aria-labelledby="curios-title">
+    <h2 id="curios-title" class="h2 c-full" data-reveal>Off the clock. <span class="mute">Things I collect.</span></h2>
+    <ul class="curios c-3" data-reveal>
       {a.interests.map((i) => <li class="tag">{i}</li>)}
     </ul>
   </section>
@@ -65,12 +67,12 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
 
 <style>
   .intro { padding-top: clamp(8rem, 16vw, 12rem); }
-  .intro h1 { max-width: 18ch; }
-  .split { display: grid; grid-template-columns: minmax(0, 0.75fr) 1fr; gap: 0.75rem; margin-top: clamp(3rem, 6vw, 5rem); }
-  .portrait { margin: 0; overflow: hidden; aspect-ratio: 4 / 5; }
+  .split { margin-top: clamp(3rem, 6vw, 5rem); align-items: end; }
+  .portrait { margin: 0; }
+  .portrait .card { overflow: hidden; aspect-ratio: 4 / 5; }
   .portrait img { width: 100%; height: 100%; object-fit: cover; }
-  .hello { padding: clamp(1.4rem, 3vw, 2.4rem); display: flex; flex-direction: column; justify-content: space-between; gap: 2rem; }
-  .hello .h3 { max-width: 26ch; }
+  .hello { display: flex; flex-direction: column; justify-content: end; gap: 2.5rem; }
+  .hello .h3 { max-width: 24ch; margin: 0; }
   .stats { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
   .stats div { border-top: 1px solid var(--line); padding-top: 0.8rem; }
   .stats .label { margin-bottom: 0.3rem; }
@@ -79,23 +81,26 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
   .block { margin-top: clamp(4rem, 9vw, 8rem); }
   .block h2 { margin-bottom: clamp(1.5rem, 3vw, 2.5rem); }
 
-  .exp { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
-  .exp li { display: grid; grid-template-columns: 10rem 1fr 1fr; gap: 1rem; padding: 1.3rem 1.5rem; align-items: baseline; }
+  /* Experience rows: one ruled line per job, columns locked to the grid */
+  .exp { list-style: none; margin: 0; }
+  .exp li { padding-block: 1.3rem; border-top: 1px solid var(--line); align-items: baseline; }
+  .exp li:last-child { border-bottom: 1px solid var(--line); }
   .years, .role span { color: var(--mute); font-size: var(--step--1); }
 
-  .kit { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.75rem; }
-  .kit li { padding: 1rem; display: grid; gap: 0.2rem; transition: border-color 0.35s; }
-  .kit li:hover { border-color: #ffffff26; }
-  .kit .art { background: #181818; border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; margin-bottom: 0.8rem; }
-  .kit span { color: var(--mute); font-size: var(--step--1); }
+  .kit { list-style: none; margin: 0; row-gap: 1rem; }
+  .tool { padding: 1rem; display: grid; gap: 0.2rem; height: 100%; transition: border-color 0.35s; }
+  .tool:hover { border-color: var(--line-strong); }
+  .tool .art { background: var(--well); border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; margin-bottom: 0.8rem; }
+  .tool span { color: var(--mute); font-size: var(--step--1); }
 
-  .curios { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .curios { list-style: none; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .curios .tag { font-size: var(--step-0); padding: 0.5rem 1.1rem; color: var(--ink); background: var(--panel); transition: background-color 0.3s, color 0.3s; }
   .curios .tag:hover { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 
   @media (max-width: 760px) {
-    .split { grid-template-columns: 1fr; }
+    .split { row-gap: 2rem; }
+    .portrait, .hello { grid-column: 1 / -1; }
     .stats { grid-template-columns: 1fr; }
-    .exp li { grid-template-columns: 1fr; gap: 0.3rem; }
+    .exp .role { grid-column: 1 / -1; margin-top: 0.4rem; }
   }
 </style>

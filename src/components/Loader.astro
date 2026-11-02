@@ -1,0 +1,141 @@
+---
+// First-visit loader. The logo fills from left to right while the fonts and
+// the first project images load, with a percentage and project names ticking
+// past, then the screen dissolves away in an ordered-dither sweep, the same
+// dither as the background.
+// Shown once per browser session; Base sets html.is-loading before paint.
+import Logo from './Logo.astro';
+import { getWork } from '../lib/content';
+const work = await getWork();
+const names = work.map((w) => w.title);
+const year = new Date().getFullYear();
+---
+<div class="loader" aria-hidden="true" data-names={JSON.stringify(names)}>
+  <canvas class="ld-veil"></canvas>
+  <div class="ld-top mono">
+    <span>jjuncreative</span>
+    <span>Portfolio ©{year}</span>
+  </div>
+  <div class="ld-mark">
+    <Logo class="ld-ghost" />
+    <div class="ld-fill"><Logo /></div>
+  </div>
+  <div class="ld-bottom mono">
+    <p class="ld-meta"><span class="ld-label">Loading</span> <span class="ld-name">{names[0]}</span></p>
+    <p class="ld-count"><span>000</span>%</p>
+  </div>
+</div>
+
+<script>
+  import { gsap, reduced } from '../scripts/smooth';
+  import { makeVeil } from '../scripts/veil';
+
+  const root = document.documentElement;
+  const el = document.querySelector<HTMLElement>('.loader');
+
+  const finish = () => {
+    root.classList.remove('is-loading');
+    try { sessionStorage.setItem('jj-loaded', '1'); } catch {}
+    window.dispatchEvent(new Event('loader:done'));
+  };
+
+  if (!el || !root.classList.contains('is-loading')) {
+    el?.remove();
+  } else if (reduced()) {
+    // No motion: a short fade once things are ready
+    document.fonts.ready.then(() => {
+      window.dispatchEvent(new Event('loader:reveal'));
+      el.style.transition = 'opacity 0.3s';
+      el.style.opacity = '0';
+      setTimeout(() => { el.remove(); finish(); }, 300);
+    });
+  } else {
+    run(el);
+  }
+
+  function run(el: HTMLElement) {
+    const count = el.querySelector<HTMLElement>('.ld-count span')!;
+    const name = el.querySelector<HTMLElement>('.ld-name')!;
+    const mark = el.querySelector<HTMLElement>('.ld-mark')!;
+    const veil = el.querySelector<HTMLCanvasElement>('.ld-veil')!;
+    const names: string[] = JSON.parse(el.dataset.names || '[]');
+
+    // ── Progress: real loading, but never faster than MIN or slower than MAX ──
+    const MIN = 1700, MAX = 4500, t0 = performance.now();
+    const imgs = [...document.images].filter((i) => i.loading !== 'lazy');
+    let loaded = 0;
+    const total = imgs.length + 1; // + fonts
+    const tick = () => loaded++;
+    imgs.forEach((i) => (i.complete ? tick() : (i.addEventListener('load', tick, { once: true }), i.addEventListener('error', tick, { once: true }))));
+    document.fonts.ready.then(tick);
+
+    const shown = { v: 0 };
+    let done = false;
+    gsap.ticker.add(function step() {
+      const elapsed = performance.now() - t0;
+      const real = elapsed > MAX ? 1 : loaded / total;
+      const target = Math.min(real, elapsed / MIN) * 100;
+      shown.v += (target - shown.v) * 0.08;
+      if (target >= 100 && shown.v > 99.5) shown.v = 100;
+      const v = Math.round(shown.v);
+      count.textContent = String(v).padStart(3, '0');
+      mark.style.setProperty('--p', `${shown.v}%`);
+      if (names.length) name.textContent = names[Math.min(names.length - 1, Math.floor((shown.v / 100) * names.length))];
+      if (v === 100 && !done) {
+        done = true;
+        gsap.ticker.remove(step);
+        out();
+      }
+    });
+
+    // ── Exit: text lifts away, then the veil dissolves cell by cell ──
+    function out() {
+      el.classList.add('is-done');
+      const tl = gsap.timeline({ onComplete: () => { el.remove(); finish(); } });
+      tl.to(el.querySelectorAll('.ld-top > *, .ld-bottom > *'), {
+        yPercent: -40, opacity: 0, duration: 0.5, ease: 'power3.in', stagger: 0.04,
+      }, 0.3)
+        .to(mark, { yPercent: -18, opacity: 0, filter: 'blur(6px)', duration: 0.6, ease: 'power3.in' }, 0.45);
+      tl.add(() => window.dispatchEvent(new Event('loader:reveal')), 0.75);
+      const p = { t: 0 };
+      tl.to(p, { t: 1, duration: 1, ease: 'power2.inOut', onUpdate: () => dissolve(p.t) }, 0.7);
+    }
+
+    // ── Veil: the page colour, dissolved in a dither sweep (scripts/veil.ts) ──
+    const { draw: dissolve } = makeVeil(veil, { from: 'bottom-left' });
+    dissolve(0);
+  }
+</script>
+
+<style>
+  .loader { display: none; }
+  :global(html.is-loading) { overflow: hidden; }
+  :global(html.is-loading) .loader {
+    display: block; position: fixed; inset: 0; z-index: 1000;
+    color: var(--ink); pointer-events: none;
+  }
+  .ld-veil { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+
+  .ld-top {
+    position: absolute; top: 1.6rem; left: var(--gutter); right: var(--gutter);
+    display: flex; justify-content: space-between; color: var(--mute);
+  }
+  /* Logo fills from the left: a faint ghost underneath, the solid copy clipped */
+  .ld-mark {
+    --p: 0%;
+    position: absolute; left: 50%; top: 50%; translate: -50% -50%;
+    width: min(84vw, 62rem);
+  }
+  .ld-mark :global(.ld-ghost) { width: 100%; opacity: 0.12; }
+  .ld-fill { position: absolute; inset: 0; clip-path: inset(0 calc(100% - var(--p)) 0 0); }
+  .ld-fill :global(.logo) { width: 100%; }
+  .is-done .ld-fill { color: var(--accent-text); transition: color 0.25s; }
+
+  .ld-bottom {
+    position: absolute; left: var(--gutter); right: var(--gutter); bottom: 1.6rem;
+    display: flex; justify-content: space-between; align-items: end; gap: 1rem;
+  }
+  .ld-bottom p { margin: 0; max-width: none; }
+  .ld-label { color: var(--mute); }
+  .ld-count { font-variant-numeric: tabular-nums; }
+</style>
