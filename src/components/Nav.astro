@@ -53,7 +53,7 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
 </div>
 
 <script>
-  import { isMuted, setMuted, tick } from '../scripts/sound';
+  import { isMuted, setMuted } from '../scripts/sound';
   import { gsap, reduced, getLenis } from '../scripts/smooth';
   import { onPage } from '../scripts/page';
 
@@ -113,7 +113,7 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
         hl.style.height = `${a.offsetHeight}px`;
         hl.style.transform = `translateY(${a.offsetTop}px)`;
       };
-      items.forEach((a) => a.addEventListener('pointerenter', () => { moveHl(a); tick(); }));
+      items.forEach((a) => a.addEventListener('pointerenter', () => moveHl(a)));
       items.forEach((a) => a.addEventListener('focus', () => moveHl(a)));
       nav.addEventListener('pointerleave', () => moveHl(current));
 

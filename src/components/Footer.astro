@@ -35,7 +35,6 @@ const [user] = site.email.split('@');
 </footer>
 
 <script>
-  import { tick } from '../scripts/sound';
   import { onPage } from '../scripts/page';
 
   onPage(() => {
@@ -48,7 +47,6 @@ const [user] = site.email.split('@');
           await navigator.clipboard.writeText(btn.dataset.copy!);
           text.textContent = 'Copied to clipboard ✓';
           btn.classList.add('copied');
-          tick();
         } catch {
           window.location.href = `mailto:${btn.dataset.copy}`;
           return;

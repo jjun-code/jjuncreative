@@ -24,7 +24,7 @@ export function setMuted(off: boolean) {
    first gesture, pauses while the tab is hidden, and picks up where it left
    off on the next page. Browsers without Ogg Vorbis (older Safari) skip it. */
 const MUSIC_SRC = '/audio/gentle-static-sky.ogg';
-const MUSIC_VOLUME = 0.175;
+const MUSIC_VOLUME = 0.14;
 const POS_KEY = 'music-pos';
 let music: HTMLAudioElement | null = null;
 let fade = 0;
@@ -50,8 +50,9 @@ function fadeTo(target: number, ms: number, done?: () => void) {
   cancelAnimationFrame(fade);
   const from = a.volume, t0 = performance.now();
   const step = (now: number) => {
-    const k = Math.min(1, (now - t0) / ms);
-    a.volume = from + (target - from) * k;
+    // A frame's timestamp can be a touch earlier than t0, so clamp both ends
+    const k = Math.max(0, Math.min(1, (now - t0) / ms));
+    a.volume = Math.max(0, Math.min(1, from + (target - from) * k));
     if (k < 1) fade = requestAnimationFrame(step);
     else done?.();
   };
