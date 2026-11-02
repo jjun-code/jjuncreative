@@ -5,14 +5,26 @@ import { reader, src } from '../lib/content';
 const a = (await reader.singletons.about.read())!;
 const portrait = src(a.portrait, 1200);
 // Brand logos for the toolkit, matched on the tool's first word (Simple Icons, CC0).
-// Anything without a logo (e.g. Adobe, which doesn't allow its marks to be
-// redistributed) falls back to a two-letter monogram.
+// Adobe isn't in Simple Icons, so its "A" mark is drawn here on the same 24×24 box.
+// Anything else without a logo falls back to a two-letter monogram.
+const siAdobe = { path: 'M13.966 22.624l-1.69-4.281H8.122l3.892-9.144 5.662 13.425zM8.884 1.376H0v21.248zm15.116 0h-8.884L24 22.624Z', hex: 'FA0F00' };
 const logos: Record<string, { path: string; hex: string }> = {
-  figma: siFigma, framer: siFramer, notion: siNotion, claude: siClaude, steam: siSteam,
+  figma: siFigma, framer: siFramer, notion: siNotion, claude: siClaude, steam: siSteam, adobe: siAdobe,
 };
 const logoFor = (name: string) => logos[name.toLowerCase().split(/\s+/)[0]];
 // Black brand colours would vanish on the dark theme, so they use the text colour
 const brand = (hex: string) => (hex === '000000' || hex === '191919' ? 'var(--ink)' : `#${hex}`);
+// Each card floods with its brand colour on hover; the logo then switches to
+// whichever of white or near-black reads on that colour
+const colours = (name: string) => {
+  const hex = logoFor(name)?.hex;
+  if (!hex) return { brand: 'var(--ink)', on: 'var(--bg)' };
+  const b = brand(hex);
+  if (b.startsWith('var(')) return { brand: b, on: 'var(--bg)' };
+  const [r, g, bl] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  return { brand: b, on: lum > 0.6 ? '#141414' : '#ffffff' };
+};
 // Split the headline after its first sentence or comma for the two-tone treatment
 const m = a.headline.match(/^(.+?[.,])\s+(.+)$/);
 const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
@@ -53,20 +65,29 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
 
   <section class="grid block" aria-labelledby="kit-title">
     <h2 id="kit-title" class="h2 c-full" data-reveal>Toolkit. <span class="mute">What I use every day.</span></h2>
+    <!-- Hover (or tap) a card: it floods with the tool's brand colour in a
+         dithered pixel wave from where the pointer came in, and tilts toward it -->
     <ul class="kit c-full sub">
-      {a.toolkit.map((t) => (
-        <li data-reveal>
-          <div class="tool card" style={logoFor(t.name) ? `--brand:${brand(logoFor(t.name)!.hex)}` : undefined}>
-            <div class="art">
-              {logoFor(t.name)
-                ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d={logoFor(t.name)!.path} /></svg>
-                : <span class="mono-mark" aria-hidden="true">{t.name.slice(0, 2)}</span>}
+      {a.toolkit.map((t, i) => {
+        const c = colours(t.name);
+        return (
+          <li data-reveal>
+            <div class="tool" style={`--brand:${c.brand}; --on:${c.on}`}>
+              <canvas class="flood" aria-hidden="true"></canvas>
+              <span class="idx mono" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+              <div class="mark">
+                {logoFor(t.name)
+                  ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d={logoFor(t.name)!.path} /></svg>
+                  : <span class="mono-mark" aria-hidden="true">{t.name.slice(0, 2)}</span>}
+              </div>
+              <div class="meta">
+                <strong>{t.name}</strong>
+                <span class="mono">{t.use}</span>
+              </div>
             </div>
-            <strong>{t.name}</strong>
-            <span>{t.use}</span>
-          </div>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   </section>
 
@@ -96,6 +117,76 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
 <script>
   import { reduced } from '../scripts/smooth';
   import { onPage } from '../scripts/page';
+  // 4×4 ordered-dither thresholds, 0–1 (same family as the background dither)
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+  const CELL = 6; // px per flood pixel
+
+  // Toolkit cards: flood with the brand colour from where the pointer came in,
+  // drain toward where it left, and tilt toward the pointer
+  function initToolkit() {
+    const rm = reduced();
+    const cards = [...document.querySelectorAll<HTMLElement>('.tool')];
+    const stops: (() => void)[] = [];
+    cards.forEach((card) => {
+      const canvas = card.querySelector<HTMLCanvasElement>('.flood')!;
+      const ctx = canvas.getContext('2d')!;
+      let cw = 0, ch = 0, t = 0, target = 0, ox = 0, oy = 0, raf = 0;
+      const size = () => {
+        cw = Math.ceil(card.clientWidth / CELL); ch = Math.ceil(card.clientHeight / CELL);
+        canvas.width = cw; canvas.height = ch;
+      };
+      const draw = () => {
+        ctx.clearRect(0, 0, cw, ch);
+        if (t <= 0) return;
+        ctx.fillStyle = getComputedStyle(card).getPropertyValue('--brand').trim();
+        // Furthest corner from the origin, so t = 1 always fills the card
+        const far = Math.max(Math.hypot(ox, oy), Math.hypot(cw - ox, oy), Math.hypot(ox, ch - oy), Math.hypot(cw - ox, ch - oy));
+        for (let y = 0; y < ch; y++) {
+          for (let x = 0; x < cw; x++) {
+            const th = (Math.hypot(x - ox, y - oy) / far) * 0.65 + BAYER[(y & 3) * 4 + (x & 3)] * 0.35;
+            if (th < t) ctx.fillRect(x, y, 1, 1);
+          }
+        }
+      };
+      const loop = () => {
+        t += (target - t) * (rm ? 1 : 0.16);
+        if (Math.abs(target - t) < 0.004) t = target;
+        card.classList.toggle('lit', t > 0.55);
+        draw();
+        raf = t !== target ? requestAnimationFrame(loop) : 0;
+      };
+      const go = (to: number, e?: PointerEvent) => {
+        if (e) {
+          const r = card.getBoundingClientRect();
+          ox = (e.clientX - r.left) / CELL; oy = (e.clientY - r.top) / CELL;
+        }
+        target = to;
+        if (!raf) raf = requestAnimationFrame(loop);
+      };
+      size();
+      card.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') go(1.05, e); });
+      card.addEventListener('pointerleave', (e) => {
+        if (e.pointerType !== 'mouse') return;
+        go(0, e);
+        card.style.setProperty('--rx', '0deg'); card.style.setProperty('--ry', '0deg');
+      });
+      // Touch: tap to flood, tap again to clear
+      card.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') go(target > 0 ? 0 : 1.05, e); });
+      card.addEventListener('pointermove', (e) => {
+        if (e.pointerType !== 'mouse' || rm) return;
+        const r = card.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width - 0.5, py = (e.clientY - r.top) / r.height - 0.5;
+        card.style.setProperty('--rx', `${(-py * 10).toFixed(2)}deg`);
+        card.style.setProperty('--ry', `${(px * 12).toFixed(2)}deg`);
+      });
+      const ro = new ResizeObserver(() => { size(); draw(); });
+      ro.observe(card);
+      stops.push(() => { cancelAnimationFrame(raf); ro.disconnect(); });
+    });
+    return () => stops.forEach((s) => s());
+  }
+  onPage(initToolkit);
+
   onPage(() => {
     // Light up one interest at a time while nobody is hovering the list
     const list = document.querySelector<HTMLElement>('.int-list');
@@ -139,18 +230,35 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
   .exp li:last-child { border-bottom: 1px solid var(--line); }
   .years, .role span { color: var(--mute); font-size: var(--step--1); }
 
-  .kit { list-style: none; margin: 0; row-gap: 1rem; }
-  .tool { padding: 1rem; display: grid; gap: 0.2rem; height: 100%; transition: border-color 0.35s; }
-  .tool:hover { border-color: var(--line-strong); }
-  /* Logo well: the mark in the text colour, switching to its brand colour on hover */
-  .tool .art {
-    display: grid; place-items: center; aspect-ratio: 16 / 9; margin-bottom: 0.8rem;
-    background: var(--well); border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
+  /* Toolkit: square cards that flood with the brand colour (script below) */
+  .kit { list-style: none; margin: 0; row-gap: 1rem; perspective: 900px; }
+  .tool {
+    position: relative; isolation: isolate; overflow: hidden; aspect-ratio: 1;
+    display: grid; grid-template-rows: auto 1fr auto; padding: 1rem;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    color: var(--ink); cursor: default;
+    transform: rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+    transition: transform 0.5s var(--ease), border-color 0.35s, color 0.3s;
   }
-  .tool .art svg { width: clamp(2rem, 1.4rem + 1.4vw, 2.75rem); height: auto; fill: currentColor; transition: fill 0.35s, transform 0.5s var(--ease); }
-  .tool:hover .art svg { fill: var(--brand, var(--ink)); transform: scale(1.08); }
-  .tool .mono-mark { color: inherit; font-size: clamp(1.6rem, 1rem + 1.4vw, 2.4rem); font-weight: 600; letter-spacing: -0.06em; line-height: 1; }
-  .tool > span { color: var(--mute); font-size: var(--step--1); }
+  .tool.lit { border-color: transparent; color: var(--on); }
+  /* Low-res canvas, scaled up with crisp pixels */
+  .flood { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; image-rendering: pixelated; }
+  .idx { color: var(--dim); transition: color 0.3s; }
+  .lit .idx { color: inherit; opacity: 0.7; }
+  .mark { display: grid; place-items: center; }
+  .mark svg {
+    width: clamp(2.25rem, 1.4rem + 1.8vw, 3.25rem); height: auto; fill: currentColor;
+    transition: transform 0.6s var(--ease);
+  }
+  .lit .mark svg, .lit .mono-mark { transform: scale(1.12); }
+  .mono-mark {
+    display: inline-block; font-size: clamp(1.8rem, 1rem + 1.8vw, 2.8rem); font-weight: 600; letter-spacing: -0.06em; line-height: 1;
+    transition: transform 0.6s var(--ease);
+  }
+  .meta { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+  .meta strong { font-weight: 500; }
+  .meta .mono { color: var(--mute); transition: color 0.3s; }
+  .lit .meta .mono { color: inherit; opacity: 0.75; }
 
   /* Interests: big flowing type, dim until lit */
   .interests { padding-bottom: clamp(2rem, 5vw, 4rem); }
