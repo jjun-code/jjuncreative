@@ -60,7 +60,7 @@ const categories = [...new Set(work.map((w) => w.category).filter(Boolean))];
   .item:hover .thumb img { scale: 1.04; }
   .title { margin: 0.9rem 0 0; color: var(--ink); transition: color 0.3s; }
   .item:hover .title { color: var(--accent-text); }
-  .cat { margin: 0; color: var(--dim); font-size: 0.65rem; }
+  .cat { margin: 0; color: var(--dim); font-size: var(--step--2); }
 
   @media (max-width: 760px) {
     .filters { position: static; grid-column: 1 / -1; margin-bottom: 1.5rem; }

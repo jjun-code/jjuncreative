@@ -98,7 +98,7 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
   .top { padding-top: clamp(7rem, 13vw, 10rem); row-gap: 0; }
   .crumbs { display: flex; align-items: center; justify-content: space-between; }
   .crumbs .tag:hover { color: var(--ink); border-color: var(--line-strong); }
-  .title { font-size: clamp(3rem, 1.5rem + 8vw, 10rem); margin: 2rem 0 2.5rem; overflow-wrap: anywhere; }
+  .title { font-size: var(--step-5); margin: 2rem 0 2.5rem; overflow-wrap: anywhere; }
   .summary { color: var(--mute); margin: 0; }
   /* Facts sit one per column, each under a rule that starts on its grid line */
   .facts { margin: 0; }

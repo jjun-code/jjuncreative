@@ -1,6 +1,5 @@
 ---
 import Logo from './Logo.astro';
-const { site } = Astro.props;
 const path = Astro.url.pathname;
 const links = [
   { href: '/', label: 'Home' },
@@ -31,43 +30,31 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
 
 </header>
 
-<!-- Full-screen menu: a dither veil sweeps in from the menu button, then the
-     links rise into place on the page grid -->
+<!-- Menu: a compact panel that grows out of the menu button. A highlight
+     pill rests on the current page and glides to whichever link you hover. -->
 <div id="menu" class="menu" hidden>
-  <canvas class="menu-veil" aria-hidden="true"></canvas>
-  <div class="menu-body grid">
-    <div class="menu-side c-1">
-      <p class="label">Menu</p>
-      <dl class="menu-info mono">
-        <div><dt>Local time</dt><dd><span class="clock">--:--:--</span> NZ</dd></div>
-        <div><dt>Based in</dt><dd>{site.location}</dd></div>
-        <div><dt>Email</dt><dd><a href={`mailto:${site.email}`} class="sweep">{site.email}</a></dd></div>
-        <div><dt>Elsewhere</dt><dd class="socials">{site.socials.map((s: any) => <a href={s.url} target="_blank" rel="noopener" class="sweep">{s.label} ↗</a>)}</dd></div>
-      </dl>
-    </div>
-    <nav class="menu-links c-3" aria-label="Main">
-      <ol>
-        {links.map((l, i) => (
-          <li>
-            <a href={l.href} aria-current={isCurrent(l.href) ? 'page' : undefined}>
-              <span class="idx mono">({String(i + 1).padStart(2, '0')})</span>
-              <span class="pip" aria-hidden="true"></span>
-              <span class="word" aria-hidden="true">
-                {[...l.label].map((ch, j) => <span class="ch" style={`--j:${j}`}><span>{ch}</span><span>{ch}</span></span>)}
-              </span>
-              <span class="visually-hidden">{l.label}</span>
-            </a>
-          </li>
-        ))}
-      </ol>
+  <div class="menu-backdrop" aria-hidden="true"></div>
+  <section class="menu-panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="menu-title">
+    <button class="menu-head" type="button" aria-label="Close menu">
+      <span id="menu-title">Menu</span>
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" /></svg>
+    </button>
+    <nav class="menu-links" aria-label="Main">
+      <span class="hl" aria-hidden="true"></span>
+      {links.map((l, i) => (
+        <a href={l.href} aria-current={isCurrent(l.href) ? 'page' : undefined}>
+          <span class="idx" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
+          <span class="name">{l.label}</span>
+          <span class="here" aria-hidden="true"></span>
+        </a>
+      ))}
     </nav>
-  </div>
+  </section>
 </div>
 
 <script>
   import { isMuted, setMuted, tick } from '../scripts/sound';
   import { gsap, reduced, getLenis } from '../scripts/smooth';
-  import { makeVeil } from '../scripts/veil';
 
   // Sound on/off. Remembered across visits.
   const soundBtn = document.querySelector<HTMLButtonElement>('.sound-btn');
@@ -103,48 +90,69 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
   const btn = document.querySelector<HTMLButtonElement>('.menu-btn');
   const menu = document.getElementById('menu');
   if (btn && menu) {
-    const veil = makeVeil(menu.querySelector<HTMLCanvasElement>('.menu-veil')!, { cell: 12, from: 'top-right' });
-    const words = [...menu.querySelectorAll<HTMLElement>('.menu-links li')];
-    const side = [...menu.querySelectorAll<HTMLElement>('.menu-side > *')];
-    const clock = menu.querySelector<HTMLElement>('.clock')!;
-    const fmt = new Intl.DateTimeFormat('en-NZ', {
-      timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-    });
+    const panel = menu.querySelector<HTMLElement>('.menu-panel')!;
+    const head = menu.querySelector<HTMLElement>('.menu-head')!;
+    const backdrop = menu.querySelector<HTMLElement>('.menu-backdrop')!;
+    const nav = menu.querySelector<HTMLElement>('.menu-links')!;
+    const hl = nav.querySelector<HTMLElement>('.hl')!;
+    const items = [...nav.querySelectorAll<HTMLAnchorElement>('a')];
+    const current = items.find((a) => a.hasAttribute('aria-current'));
     const rm = reduced();
-    const v = { t: 1 };
-    let clockTimer = 0;
     let tl: ReturnType<typeof gsap.timeline> | null = null;
 
-    const set = (open: boolean) => {
+    // The highlight pill: placed instantly when the panel opens, glides after
+    const moveHl = (a: HTMLElement | undefined, glide = true) => {
+      hl.classList.toggle('glide', glide);
+      if (!a) { hl.style.opacity = '0'; return; }
+      hl.style.opacity = '1';
+      hl.style.height = `${a.offsetHeight}px`;
+      hl.style.transform = `translateY(${a.offsetTop}px)`;
+    };
+    items.forEach((a) => a.addEventListener('pointerenter', () => { moveHl(a); tick(); }));
+    items.forEach((a) => a.addEventListener('focus', () => moveHl(a)));
+    nav.addEventListener('pointerleave', () => moveHl(current));
+
+    // Clip showing only a button-sized top-right corner of the panel
+    const collapsed = () => {
+      const b = btn.getBoundingClientRect();
+      return `inset(0px 0px ${panel.offsetHeight - b.height}px ${panel.offsetWidth - b.width}px round ${b.height / 2}px)`;
+    };
+    const full = 'inset(0px 0px 0px 0px round 24px)';
+
+    const set = (open: boolean, byKeyboard = false) => {
       btn.setAttribute('aria-expanded', String(open));
-      btn.setAttribute('aria-label', open ? 'Close menu' : 'Menu');
       document.documentElement.classList.toggle('menu-open', open);
       tl?.kill();
       if (open) {
+        // Pin the panel's top-right corner to the menu button
+        const b = btn.getBoundingClientRect();
+        panel.style.top = `${b.top}px`;
+        panel.style.right = `${window.innerWidth - b.right}px`;
+        panel.style.setProperty('--edge', `${window.innerWidth - b.right}px`);
         menu.hidden = false;
         getLenis()?.stop();
-        const tickClock = () => (clock.textContent = fmt.format(new Date()));
-        tickClock();
-        clockTimer = window.setInterval(tickClock, 1000);
-        veil.size();
+        moveHl(current, false);
         tl = gsap.timeline()
-          .to(v, { t: 0, duration: rm ? 0.01 : 0.6, ease: 'power2.inOut', onUpdate: () => veil.draw(v.t) })
-          .fromTo(words, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, duration: rm ? 0.01 : 0.9, ease: 'expo.out', stagger: 0.06 }, rm ? 0 : 0.3)
-          .fromTo(side, { y: 16, opacity: 0 }, { y: 0, opacity: 1, duration: rm ? 0.01 : 0.8, ease: 'expo.out', stagger: 0.05 }, rm ? 0 : 0.4);
-        menu.querySelector<HTMLElement>('.menu-links a')?.focus({ preventScroll: true });
+          .fromTo(backdrop, { opacity: 0 }, { opacity: 1, duration: rm ? 0.01 : 0.14, ease: 'power1.out' }, 0)
+          .fromTo(panel, { clipPath: collapsed(), x: 15 }, { clipPath: full, x: 0, duration: rm ? 0.01 : 0.26, ease: 'expo.out' }, 0)
+          .fromTo(head, { opacity: 0, y: -3 }, { opacity: 1, y: 0, duration: rm ? 0.01 : 0.2, ease: 'power2.out' }, 0);
+        // Keyboard users land on a link; a mouse click focuses the panel
+        // itself so no focus ring flashes up
+        (byKeyboard ? current ?? items[0] : panel).focus({ preventScroll: true });
       } else {
-        clearInterval(clockTimer);
         tl = gsap.timeline({ onComplete: () => { menu.hidden = true; getLenis()?.start(); } })
-          .to([...words, ...side], { yPercent: -30, opacity: 0, duration: rm ? 0.01 : 0.35, ease: 'power2.in', stagger: 0.02 })
-          .to(v, { t: 1, duration: rm ? 0.01 : 0.55, ease: 'power2.inOut', onUpdate: () => veil.draw(v.t) }, rm ? 0 : 0.15);
+          .to(head, { opacity: 0, duration: rm ? 0.01 : 0.05 }, 0)
+          .to(panel, { clipPath: collapsed(), duration: rm ? 0.01 : 0.2, ease: 'expo.out' }, 0)
+          .to(backdrop, { opacity: 0, duration: rm ? 0.01 : 0.14, ease: 'power1.out' }, 0);
       }
     };
-    btn.addEventListener('click', () => set(btn.getAttribute('aria-expanded') !== 'true'));
+    btn.addEventListener('click', (e) => set(true, e.detail === 0));
+    head.addEventListener('click', () => { set(false); btn.focus(); });
+    backdrop.addEventListener('click', () => set(false));
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') { set(false); btn.focus(); }
     });
-    // A soft tick as you move over the links
-    menu.querySelectorAll('.menu-links a').forEach((a) => a.addEventListener('pointerenter', () => tick()));
+    window.addEventListener('resize', () => { if (!menu.hidden) set(false); });
   }
 </script>
 
@@ -178,53 +186,56 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
   .theme-btn:hover svg { transform: rotate(-20deg); }
   :global([data-theme='light']) .theme-btn .sun, :global([data-theme='dark']) .theme-btn .moon { display: none; }
 
-  .dots { display: grid; grid-template-columns: 5px 5px; gap: 5px; transition: transform 0.5s var(--ease); }
+  .dots { display: grid; grid-template-columns: 5px 5px; gap: 5px; }
   .dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-  .menu-btn[aria-expanded='true'] .dots { transform: rotate(45deg); }
 
-  /* ── Full-screen menu ── */
-  .menu { position: fixed; inset: 0; z-index: 45; }
-  .menu-veil { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; }
+  /* ── Menu panel ── */
+  .menu { position: fixed; inset: 0; z-index: 60; }
   :global(html.menu-open) { overflow: hidden; }
-  .menu-body { position: relative; height: 100%; padding-top: calc(5.5rem + 2rem); padding-bottom: 2rem; }
-
-  .menu-side { display: flex; flex-direction: column; justify-content: space-between; }
-  .menu-info { margin: 0; display: grid; gap: 1rem; }
-  .menu-info div { border-top: 1px solid var(--line); padding-top: 0.6rem; }
-  .menu-info dt { color: var(--dim); }
-  .menu-info dd { margin: 0; color: var(--ink); text-transform: none; font-size: 0.8rem; }
-  .menu-info .socials { display: flex; gap: 1rem; flex-wrap: wrap; }
-  .clock { font-variant-numeric: tabular-nums; }
-
-  .menu-links { align-self: end; }
-  .menu-links ol { list-style: none; margin: 0; padding: 0; }
-  .menu-links li { overflow: hidden; border-top: 1px solid var(--line); }
-  .menu-links li:last-child { border-bottom: 1px solid var(--line); }
-  .menu-links a {
-    display: flex; align-items: center; gap: clamp(0.8rem, 2vw, 2rem);
-    padding-block: 0.12em;
-    font-size: clamp(3rem, 1rem + 7.5vw, 9rem); font-weight: 500; letter-spacing: -0.06em; line-height: 0.95;
-    color: var(--ink); transition: color 0.35s, translate 0.6s var(--ease);
+  .menu-backdrop { position: absolute; inset: 0; background: #0000005c; }
+  /* Always dark, like a floating palette, whatever the page theme */
+  .menu-panel {
+    /* --edge is the gap to the right of the menu button; kept on both sides */
+    position: absolute; width: 316px; max-width: calc(100vw - 2 * var(--edge, 1rem));
+    max-height: calc(100dvh - 2.5rem); overflow-y: auto; overscroll-behavior: contain;
+    padding: 0 8px 8px; border-radius: 24px;
+    background: #1c1c1ce0; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    box-shadow: inset 0 0 0 1px #ffffff38, 0 16px 48px #00000038;
+    color: #fff; font-size: var(--step-0); font-weight: 500; line-height: 1.25; letter-spacing: -0.02em;
   }
-  .idx { align-self: start; padding-top: 0.9em; font-size: 0.72rem; letter-spacing: 0.02em; color: var(--dim); min-width: 2.6rem; }
-  /* Square accent pixel that grows in on hover and marks the current page */
-  .pip { flex: none; width: 0.22em; height: 0.22em; background: var(--accent); scale: 0; transition: scale 0.45s var(--ease); }
-  .menu-links a:hover .pip, .menu-links a:focus-visible .pip, .menu-links a[aria-current='page'] .pip { scale: 1; }
-  .menu-links a:hover, .menu-links a:focus-visible { translate: 0.15em 0; }
-  /* Dim the others while one is hovered */
-  .menu-links ol:hover a:not(:hover) { color: var(--dim); }
+  /* The whole header row closes the panel */
+  .menu-head {
+    display: flex; align-items: center; justify-content: space-between; width: calc(100% + 16px);
+    height: 60px; margin: 0 -8px; padding: 0 13px 0 24px; border-radius: 16px;
+    color: #ffffffad; transition: color 0.15s;
+  }
+  .menu-head:hover { color: #fff; }
+  .menu-panel:focus { outline: none; }
 
-  /* Letter roll: each letter flips to its copy, one after another */
-  .word { display: inline-flex; }
-  .ch { display: inline-block; height: 1em; overflow: hidden; }
-  .ch > span { display: block; height: 1em; line-height: 1em; transition: transform 0.55s var(--ease); transition-delay: calc(var(--j) * 22ms); }
-  .menu-links a:hover .ch > span, .menu-links a:focus-visible .ch > span { transform: translateY(-100%); }
-  .ch > span:last-child { color: var(--accent-text); }
+  .menu-links { position: relative; isolation: isolate; display: grid; }
+  .hl {
+    position: absolute; inset: 0 0 auto; z-index: -1; border-radius: 16px;
+    background: #ffffff17; opacity: 0;
+    transition: opacity 0.12s ease-out;
+  }
+  .hl.glide {
+    transition: transform 0.24s cubic-bezier(0.165, 0.84, 0.44, 1), height 0.24s cubic-bezier(0.165, 0.84, 0.44, 1), opacity 0.12s ease-out;
+  }
+  .menu-links a {
+    display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 12px 16px; border-radius: 16px;
+    color: #fff;
+  }
+  .menu-links a:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
+  .idx { color: #ffffff99; font-variant-numeric: tabular-nums; min-width: 1.3em; }
+  .name { flex: 1; }
+  /* Small dot on the page you're on */
+  .here { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); visibility: hidden; }
+  .menu-links a[aria-current='page'] .here { visibility: visible; }
 
   @media (max-width: 760px) {
-    .menu-body { grid-template-rows: 1fr auto; row-gap: 2rem; padding-top: calc(5.5rem + 1rem); }
-    .menu-side { grid-column: 1 / -1; order: 2; }
-    .menu-links { grid-column: 1 / -1; align-self: center; }
-    .menu-info { grid-template-columns: 1fr 1fr; }
+    .menu-panel { width: 420px; padding-bottom: 10px; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .menu-panel { background: #292929; backdrop-filter: none; }
   }
 </style>
