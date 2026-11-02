@@ -1,18 +1,21 @@
 ---
-// Every project as a curved card on a slowly turning cylinder, over the site's
-// pixel background. Cards stay level but climb on a diagonal as they come round
-// (low on the left, high on the right), like a spiral.
-// This is the whole home page. Scrolling, swiping or the arrow keys spin the
-// cylinder; hovering a card shows its details in the bottom left (on touch
-// screens, the card facing front shows them).
-// Cards are built from thin vertical strips set around the curve, so each one
-// bends with the cylinder. Projects repeat around the ring to fill it.
+// Every project as a portrait card in a long row that wraps around a large
+// cylinder, so it bends away at the sides, over the site's pixel background.
+// This is the whole home page. Cards are drawn with WebGL (scripts/gallery.ts),
+// which adds a lens-like colour fringe and smear toward the screen edges.
+// Scrolling, swiping or the arrow keys turn the row; a small label rides above
+// each card; hovering a card shows its details in the bottom left (on touch
+// screens, the card at the front shows them). Projects repeat to fill the ring.
 import { src } from '../lib/content';
 const { work } = Astro.props;
-const STRIPS = 12;
-const slots = Array.from({ length: Math.max(8, Math.ceil(8 / work.length) * work.length) }, (_, s) => s);
+const data = work.map((w: any) => ({
+  slug: w.slug,
+  title: w.title,
+  img: src(w.cover, 1200) || src(w.inlineImage, 1200) || src(w.gallery[0], 1200) || '',
+  tint: w.charm.color,
+}));
 ---
-<section class="projects" id="work" aria-label="Projects" data-strips={STRIPS} style={`--slots:${slots.length}; --strips:${STRIPS}`}>
+<section class="projects" id="work" aria-label="Projects" data-projects={JSON.stringify(data)}>
   <div class="stage">
     <div class="details" aria-live="polite">
       {work.map((w: any, i: number) => (
@@ -32,28 +35,16 @@ const slots = Array.from({ length: Math.max(8, Math.ceil(8 / work.length) * work
       ))}
     </div>
 
-    <div class="scene">
-      <div class="ring">
-        {slots.map((slot) => {
-          const i = slot % work.length;
-          const w = work[i];
-          const art = src(w.cover, 1200) || src(w.inlineImage, 1200) || src(w.gallery[0], 1200);
-          // The second lap repeats the first, so screen readers and the tab key skip it
-          const repeat = slot >= work.length;
-          return (
-            <a
-              href={`/work/${w.slug}/`} class="card" data-slot={slot} data-i={i} data-cursor="view"
-              aria-label={repeat ? undefined : w.title} aria-hidden={repeat ? 'true' : undefined} tabindex={repeat ? -1 : undefined}
-              style={`--slot:${slot}; --tint:${w.charm.color}`}
-            >
-              {Array.from({ length: STRIPS }, (_, j) => (
-                <span class="strip" style={`--j:${j}`}>{art && <img src={art} alt="" loading={slot < 3 ? 'eager' : 'lazy'} />}</span>
-              ))}
-            </a>
-          );
-        })}
-      </div>
-    </div>
+    <canvas class="gl" aria-hidden="true"></canvas>
+    <div class="labels" aria-hidden="true"></div>
+
+    <!-- The real links: read out by screen readers, reachable by tab, and shown
+         as a plain grid if WebGL isn't available -->
+    <ul class="fallback">
+      {work.map((w: any, i: number) => (
+        <li><a href={`/work/${w.slug}/`} data-i={i}><img src={data[i].img} alt="" loading="lazy" /><span class="mono">{w.title}</span></a></li>
+      ))}
+    </ul>
   </div>
 </section>
 
@@ -61,114 +52,124 @@ const slots = Array.from({ length: Math.max(8, Math.ceil(8 / work.length) * work
   import { gsap, reduced } from '../scripts/smooth';
   import { tick } from '../scripts/sound';
   import { onPage } from '../scripts/page';
+  import { createGallery, project, type View, type CardDraw } from '../scripts/gallery';
+  import { navigate } from 'astro:transitions/client';
+
+  type Project = { slug: string; title: string; img: string; tint: string };
 
   onPage(() => {
     const sec = document.querySelector<HTMLElement>('.projects');
     if (!sec) return;
+    const data: Project[] = JSON.parse(sec.dataset.projects!);
+    const n = data.length;
+    const canvas = sec.querySelector<HTMLCanvasElement>('canvas.gl')!;
+    const labelsBox = sec.querySelector<HTMLElement>('.labels')!;
+    const details = sec.querySelector<HTMLElement>('.details')!;
+    const entries = [...sec.querySelectorAll<HTMLElement>('.entry')];
+    const links = [...sec.querySelectorAll<HTMLAnchorElement>('.fallback a')];
+
+    const gallery = n > 0 ? createGallery(canvas, data.map((d) => ({ src: d.img, tint: d.tint }))) : null;
+    if (!gallery) { sec.classList.add('no-gl'); return; }
+
     // Listeners outside the section are removed when the page changes
     const ac = new AbortController();
     const { signal } = ac;
-
-    const ring = sec.querySelector<HTMLElement>('.ring')!;
-    const scene = sec.querySelector<HTMLElement>('.scene')!;
-    const details = sec.querySelector<HTMLElement>('.details')!;
-    const entries = [...sec.querySelectorAll<HTMLElement>('.entry')];
-    const cards = [...sec.querySelectorAll<HTMLAnchorElement>('.card')];
-    const slots = cards.length;
-    const strips = Number(sec.dataset.strips);
-    const step = 360 / slots; // degrees between cards
-    const ARC = step * 0.74; // each card's share of that, the rest is gap
-    // Phones (touch screens or narrow windows) always show the details, for
-    // the card at the front; elsewhere they appear on hover
+    const rm = reduced();
+    // Phones (touch screens or narrow windows) always show the details for the
+    // card at the front; elsewhere they appear on hover
     const mobile = window.matchMedia('(hover: none), (max-width: 760px)');
 
-    // ── Size: card width from the viewport, radius from the card's arc ──
-    let cw = 0, degPerPx = 0;
-    const size = () => {
-      const W = window.innerWidth, H = window.innerHeight;
-      cw = Math.min(W < 760 ? W * 0.52 : W * 0.28, H * 0.6, 540);
-      const r = cw / ((ARC * Math.PI) / 180);
-      sec.style.setProperty('--cw', `${cw}px`);
-      sec.style.setProperty('--ch', `${cw * 0.64}px`);
-      sec.style.setProperty('--r', `${r}px`);
-      sec.style.setProperty('--sa', `${ARC / strips}deg`);
-      sec.style.setProperty('--step', `${step}deg`);
-      degPerPx = step / (cw * 1.15);
+    // ── Layout: card size from the viewport, ring sized to fit whole projects ──
+    let view: View, slots = 0, step = 0, arc = 0, radPerPx = 0;
+    let labels: HTMLElement[] = [];
+    const layout = () => {
+      const W = window.innerWidth, H = window.innerHeight, phone = W < 760;
+      // On phones the middle card (about 2.1× cw tall) must end above the details panel
+      const cw = phone ? Math.min(W * 0.46, H * 0.2) : Math.min(W * 0.2, H * 0.33);
+      const ch = cw * 1.42, gap = cw * 0.06; // ch: portrait height at the front
+      const R = phone ? W * 1.1 : W * 0.95;
+      slots = n * Math.max(1, Math.round((2 * Math.PI * R) / (cw + gap) / n));
+      step = (2 * Math.PI) / slots;
+      arc = step * (cw / (cw + gap));
+      radPerPx = step / (cw + gap);
+      // Vanishing point just under the cards' top edge: the tops stay nearly level
+      // while cards nearer the middle hang lower and larger, as on a curved shelf
+      // (cy puts the common top line 15% down the screen, leaving room for the
+      // middle card, which hangs lowest)
+      view = { W, H, R, cw, ch, P: 1100, horizon: ch * 0.47, cy: H * 0.15 + ch / 2 };
+      labelsBox.textContent = '';
+      labels = Array.from({ length: slots }, (_, s) => {
+        const el = document.createElement('span');
+        el.className = 'tag mono';
+        el.textContent = data[s % n].title;
+        labelsBox.append(el);
+        return el;
+      });
+      gallery.resize();
     };
-    size();
+    layout();
 
     // ── Details: shown while a card (or the panel itself) is hovered ──
-    let shown = -1, hideTimer = 0;
+    let shown = -1, hideTimer = 0, front = -1;
     const show = (i: number) => {
       clearTimeout(hideTimer);
       if (i === shown) return;
       shown = i;
       entries.forEach((e, k) => (e.hidden = k !== i));
       details.classList.add('on');
-      if (!reduced()) gsap.fromTo(entries[i], { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'expo.out' });
+      if (!rm) gsap.fromTo(entries[i], { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'expo.out' });
     };
     const hide = () => {
       clearTimeout(hideTimer);
-      if (mobile.matches) { if (front >= 0) show(Number(cards[front].dataset.i)); return; }
+      if (mobile.matches) { if (front >= 0) show(front % n); return; }
       hideTimer = window.setTimeout(() => { details.classList.remove('on'); shown = -1; }, 350);
     };
-    // Hover is worked out from the mouse position every frame rather than
-    // from pointerenter/leave, which don't fire when the cylinder spins a new
-    // card under a mouse that isn't moving
-    let hovering = false, mx = 0, my = 0, mouseIn = false, hovered: HTMLElement | null = null;
-    const setHover = (c: HTMLElement | null) => {
-      if (c === hovered) return;
-      hovered?.classList.remove('is-hover');
-      hovered = c;
-      hovering = !!c;
-      if (c) { c.classList.add('is-hover'); show(Number(c.dataset.i)); } else hide();
-    };
-    const hitTest = () => {
-      if (!mouseIn) return;
-      setHover(document.elementFromPoint(mx, my)?.closest<HTMLElement>('.card') ?? null);
-    };
-    sec.addEventListener('pointermove', (e) => {
-      if (e.pointerType !== 'mouse') return;
-      mx = e.clientX; my = e.clientY; mouseIn = true;
-      hitTest();
-    });
-    sec.addEventListener('pointerleave', () => { mouseIn = false; setHover(null); });
-    cards.forEach((c) => {
-      c.addEventListener('focus', () => show(Number(c.dataset.i)));
-      c.addEventListener('blur', hide);
-    });
     details.addEventListener('pointerenter', () => clearTimeout(hideTimer));
     details.addEventListener('pointerleave', hide);
+    links.forEach((a) => {
+      a.addEventListener('focus', () => show(Number(a.dataset.i)));
+      a.addEventListener('blur', hide);
+    });
 
     // ── Motion: a slow constant drift, plus spin from input that coasts out ──
-    const DRIFT = -5; // degrees per second, right to left
-    let theta = 0, vel = 0, drift = 1, dragging = false, lastInput = -1e9, front = -1;
+    // theta and vel are in radians; step is the angle from one card to the next
+    let theta = 0, vel = 0, drift = 1, dragging = false, lastInput = -1e9;
     const spun = () => (lastInput = performance.now());
 
     sec.addEventListener('wheel', (e) => {
       e.preventDefault();
       const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       const px = e.deltaMode === 1 ? d * 40 : d;
-      vel = Math.max(-240, Math.min(240, vel - px * 0.35));
+      vel = Math.max(-step * 18, Math.min(step * 18, vel - px * 0.01 * step));
       spun();
     }, { passive: false });
 
-    let lastX = 0, lastY = 0, lastT = 0, vx = 0;
+    let lastX = 0, lastY = 0, lastT = 0, vx = 0, moved = 0;
     sec.addEventListener('touchstart', (e) => {
       lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; lastT = performance.now();
-      dragging = true; vel = 0; vx = 0;
+      dragging = true; vel = 0; vx = 0; moved = 0;
     }, { passive: true });
     sec.addEventListener('touchmove', (e) => {
       const t = e.touches[0], now = performance.now();
       const dx = t.clientX - lastX, dy = t.clientY - lastY;
-      // Sideways swipes follow the finger; vertical ones spin too
+      // Sideways swipes follow the finger; vertical ones turn it too
       const d = Math.abs(dx) >= Math.abs(dy) ? dx : -dy;
-      theta += d * degPerPx;
-      vx = (d * degPerPx * 1000) / Math.max(1, now - lastT);
+      theta += d * radPerPx;
+      moved += Math.abs(d);
+      vx = (d * radPerPx * 1000) / Math.max(1, now - lastT);
       lastX = t.clientX; lastY = t.clientY; lastT = now;
       spun();
     }, { passive: true });
-    sec.addEventListener('touchend', () => { dragging = false; vel = Math.max(-300, Math.min(300, vx)); });
+    sec.addEventListener('touchend', (e) => {
+      dragging = false;
+      vel = Math.max(-step * 18, Math.min(step * 18, vx));
+      // A tap (no drag) on a card opens it
+      const t = e.changedTouches[0];
+      if (moved < 8 && t && e.target === canvas) {
+        const hit = cardAt(t.clientX, t.clientY);
+        if (hit >= 0) navigate(`/work/${data[hit % n].slug}/`);
+      }
+    });
 
     window.addEventListener('keydown', (e) => {
       const el = e.target instanceof Element ? e.target : null;
@@ -178,61 +179,124 @@ const slots = Array.from({ length: Math.max(8, Math.ceil(8 / work.length) * work
       if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); vel += step * 3; spun(); }
     }, { signal });
 
-    // Angle of each card relative to the front, in -180..180
-    const rel = (slot: number) => ((((slot * step + theta) % 360) + 540) % 360) - 180;
-
-    const place = () => {
-      ring.style.setProperty('--theta', `${theta}deg`);
-      let nearest = 0, best = 999;
-      cards.forEach((c, slot) => {
-        const a = Math.abs(rel(slot));
-        if (a < best) { best = a; nearest = slot; }
-        // Focus: 1 for the card at the front, falling off smoothly to ~0 by
-        // the next card along. It sizes the card up and keeps it bright and
-        // solid; cards to the sides shrink and fade into the page, then turn
-        // fully transparent as they reach the edge.
-        const f = Math.exp(-((a / 22) ** 2));
-        c.style.setProperty('--k', (0.84 + 0.42 * f).toFixed(3));
-        c.style.setProperty('--fade', (0.62 * (1 - f)).toFixed(3));
-        c.style.setProperty('--o', Math.max(0, Math.min(1, (100 - a) / 35)).toFixed(3));
-        // The diagonal: cards to the right of the front sit higher, to the left lower
-        c.style.setProperty('--y', `${(-rel(slot) / 60) * cw * 0.26}px`);
-        c.style.pointerEvents = a < 70 ? 'auto' : 'none';
-      });
-      if (nearest !== front) {
-        front = nearest;
-        // Tick only when the visitor is spinning it, not on the idle drift
-        if (performance.now() - lastInput < 1200) tick();
-        if (mobile.matches && !hovered) show(Number(cards[front].dataset.i));
-      }
+    // Angle of a slot relative to the front, in -π..π
+    const rel = (s: number) => {
+      const a = (s * step + theta) % (2 * Math.PI);
+      return ((a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
     };
 
-    const rm = reduced();
+    // ── Hover: which card is under a point (front-most first) ──
+    const inQuad = (x: number, y: number, q: [number, number][]) => {
+      let sign = 0;
+      for (let i = 0; i < 4; i++) {
+        const [x1, y1] = q[i], [x2, y2] = q[(i + 1) % 4];
+        const c = (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1);
+        if (c !== 0) { if (sign && Math.sign(c) !== sign) return false; sign = Math.sign(c); }
+      }
+      return true;
+    };
+    // ── Card shape by position ──
+    // f is 1 for the card at the middle, falling smoothly to ~0 by its
+    // neighbours. Cards there grow up to 50% larger and stretch from square to
+    // portrait; their spacing grows with them (the angle is the integral of the
+    // size), so gaps stay even and nothing overlaps.
+    const erf = (x: number) => {
+      const t = 1 / (1 + 0.3275911 * Math.abs(x));
+      const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+      return Math.sign(x) * y;
+    };
+    const GROW = 0.5;
+    const shape = (a0: number) => {
+      const sigma = step * 1.4;
+      const f = Math.exp(-((a0 / sigma) ** 2));
+      const k = 1 + GROW * f;
+      return {
+        angle: a0 + GROW * sigma * (Math.sqrt(Math.PI) / 2) * erf(a0 / sigma),
+        arc: arc * k,
+        cw: view.cw * k,
+        ch: k * (view.cw + (view.ch - view.cw) * f),
+      };
+    };
+    const cardAt = (x: number, y: number) => {
+      const order = Array.from({ length: slots }, (_, s) => s)
+        .map((s) => ({ s, c: shape(rel(s)) }))
+        .filter(({ c }) => Math.abs(c.angle) < 1.4)
+        .sort((a, b) => Math.cos(b.c.angle) - Math.cos(a.c.angle));
+      for (const { s, c } of order) {
+        const q: [number, number][] = [0, 1, 1, 0].map((u, i) => project(view, c.angle, c.arc, u, i < 2 ? 0 : 1, c.ch)) as [number, number][];
+        if (inQuad(x, y, q)) return s;
+      }
+      return -1;
+    };
+    let mx = 0, my = 0, mouseIn = false, hovered = -1;
+    const setHover = (s: number) => {
+      if (s === hovered) return;
+      hovered = s;
+      canvas.style.cursor = s >= 0 ? 'pointer' : '';
+      window.dispatchEvent(new CustomEvent('cursor:label', { detail: s >= 0 ? 'view' : null }));
+      if (s >= 0) show(s % n); else hide();
+    };
+    canvas.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse') return;
+      mx = e.clientX; my = e.clientY; mouseIn = true;
+    });
+    canvas.addEventListener('pointerleave', () => { mouseIn = false; setHover(-1); });
+    canvas.addEventListener('click', () => { if (hovered >= 0) navigate(`/work/${data[hovered % n].slug}/`); });
+
+    // ── Frame ──
     const frame = (_t: number, dtMs: number) => {
       const dt = Math.min(dtMs, 50) / 1000;
-      // The drift eases off while a card is hovered, so it holds still to read
-      drift += ((hovering || rm ? 0 : 1) - drift) * Math.min(1, dt * 4);
+      // A slow drift that eases off while a card is hovered, so it holds still to read
+      drift += ((hovered >= 0 || rm ? 0 : 1) - drift) * Math.min(1, dt * 4);
       if (!dragging) {
-        theta += (DRIFT * drift + vel) * dt;
+        theta += (-0.3 * step * drift + vel) * dt;
         vel *= Math.exp(-3 * dt);
-        if (Math.abs(vel) < 0.01) vel = 0;
+        if (Math.abs(vel) < 1e-5) vel = 0;
       }
-      place();
-      hitTest();
+
+      const cards: CardDraw[] = [];
+      let nearest = 0, best = 9;
+      for (let s = 0; s < slots; s++) {
+        const a0 = rel(s);
+        if (Math.abs(a0) < best) { best = Math.abs(a0); nearest = s; }
+        const c = shape(a0), aa = Math.abs(c.angle);
+        const el = labels[s];
+        if (aa > 1.4) { el.style.opacity = '0'; continue; }
+        cards.push({ tex: s % n, ...c });
+        // Label just above the card's top-left corner, no wider than the card,
+        // fading toward the edges
+        const [x, y] = project(view, c.angle, c.arc, 0, 0, c.ch);
+        const [x2] = project(view, c.angle, c.arc, 1, 0, c.ch);
+        el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translateY(calc(-100% - 6px))`;
+        el.style.maxWidth = `${Math.max(0, x2 - x - 4).toFixed(0)}px`;
+        el.style.opacity = String(Math.max(0, Math.min(1, (1.0 - aa) / 0.35)));
+      }
+      // Back to front, so nearer cards draw over farther ones
+      cards.sort((a, b) => Math.cos(a.angle) - Math.cos(b.angle));
+      // Turning fast strengthens the fringe a little
+      gallery.draw(view, cards, Math.min(0.012, (Math.abs(vel) / step) * 0.0012));
+
+      if (nearest !== front) {
+        front = nearest;
+        // Tick only when the visitor is turning it, not on the idle drift
+        if (performance.now() - lastInput < 1200) tick();
+        if (mobile.matches && hovered < 0) show(front % n);
+      }
+      if (mouseIn) setHover(cardAt(mx, my));
     };
-    place();
     gsap.ticker.add(frame);
-    window.addEventListener('resize', () => { size(); place(); }, { signal });
+
+    window.addEventListener('resize', layout, { signal });
     mobile.addEventListener('change', () => {
-      if (mobile.matches) show(Number(cards[front].dataset.i));
-      else { setHover(null); hide(); }
+      if (mobile.matches) show(front % n);
+      else { setHover(-1); hide(); }
     }, { signal });
 
     // Entrance plays as the loader dissolves, or straight away on later pages
     const intro = () => {
       if (rm) return;
-      gsap.from(scene, { opacity: 0, scale: 0.8, y: 60, duration: 1.8, ease: 'expo.out' });
-      vel = -160; // a quick spin in
+      gsap.fromTo([canvas, labelsBox], { opacity: 0 }, { opacity: 1, duration: 1.2, ease: 'power2.out' });
+      vel = step * 9; // a quick turn in
     };
     if (document.documentElement.classList.contains('is-loading')) {
       window.addEventListener('loader:reveal', intro, { once: true, signal });
@@ -244,15 +308,26 @@ const slots = Array.from({ length: Math.max(8, Math.ceil(8 / work.length) * work
       ac.abort();
       gsap.ticker.remove(frame);
       clearTimeout(hideTimer);
+      window.dispatchEvent(new CustomEvent('cursor:label', { detail: null }));
+      gallery.destroy();
     };
   });
 </script>
 
 <style>
-  /* One fixed screen; input spins the cylinder instead of scrolling the page */
+  /* One fixed screen; input turns the row instead of scrolling the page */
   .projects { position: relative; isolation: isolate; height: 100svh; overflow: hidden; overscroll-behavior: none; touch-action: none; }
   .stage { position: absolute; inset: 0; overflow: hidden; }
   :global(html:has(.projects)) { overflow: hidden; }
+
+  .gl { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; display: block; }
+  .labels { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  /* Small project label riding above each card */
+  .labels :global(.tag) {
+    position: absolute; left: 0; top: 0; color: var(--mute); line-height: 1;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    will-change: transform, opacity; opacity: 0;
+  }
 
   /* Project details, bottom left: hidden until a card is hovered */
   /* Exactly one grid column wide (two on phones), inset from its lines like page content */
@@ -282,57 +357,22 @@ const slots = Array.from({ length: Math.max(8, Math.ceil(8 / work.length) * work
   .view { border-bottom: 1px solid transparent; transition: border-color 0.3s, color 0.3s; }
   .view:hover { color: var(--accent-text); border-color: currentColor; }
 
-  /* ── Cylinder ── */
-  .scene { position: absolute; inset: 0; z-index: 1; perspective: 1700px; perspective-origin: 50% 44%; }
-  /* Pushed back by its radius so the front cards sit at screen depth, seen from
-     a touch above, and spun by --theta from the script */
-  .ring {
-    position: absolute; left: 50%; top: 46%; width: 0; height: 0;
-    transform-style: preserve-3d;
-    transform: translateZ(calc(var(--r, 900px) * -1)) rotateX(-4deg) rotateY(var(--theta, 0deg));
+  /* Links: visually hidden (but focusable) unless WebGL is missing */
+  .fallback {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
+    list-style: none; margin: 0; padding: 0;
   }
-  .card {
-    position: absolute; left: 0; top: 0; transform-style: preserve-3d;
-    transform: rotateY(calc(var(--slot) * var(--step, 36deg))) translateY(var(--y, 0px));
-    /* Gentle bob, out of step from card to card */
-    animation: bob 7s ease-in-out infinite; animation-delay: calc(var(--slot) * -1.3s);
+  .no-gl .gl, .no-gl .labels { display: none; }
+  .no-gl .fallback {
+    position: static; width: auto; height: auto; overflow: visible; clip-path: none;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1rem;
+    padding: 7rem calc(var(--gutter) + var(--pad)) 2rem;
   }
-  @keyframes bob {
-    0%, 100% { translate: 0 0; }
-    50% { translate: 0 -12px; }
-  }
-  /* One slice of the card, angled to sit on the curve. Each shows its part of
-     the full-size image, so together they read as one bent card. */
-  .strip {
-    position: absolute; overflow: hidden;
-    width: calc(var(--cw, 400px) / var(--strips) + 1px); height: var(--ch, 256px);
-    margin: calc(var(--ch, 256px) / -2) 0 0 calc(var(--cw, 400px) / var(--strips) / -2);
-    /* --k scales the whole card: each slice grows and moves out by the same
-       factor, so the slices still meet edge to edge */
-    transform: rotateY(calc((var(--j) - (var(--strips) - 1) / 2) * var(--sa, 2deg))) translateZ(calc(var(--r, 900px) * var(--k, 1))) scale(var(--k, 1));
-    backface-visibility: hidden;
-    background: var(--tint);
-    opacity: var(--o, 1);
-  }
-  /* Fades the card toward the page colour. Done inside each (opaque) slice
-     rather than with opacity, so the slices' 1px overlaps don't show as lines. */
-  .strip::after {
-    content: ''; position: absolute; inset: 0; background: var(--bg);
-    opacity: var(--fade, 0); transition: opacity 0.3s;
-  }
-  .strip img {
-    position: absolute; top: 0; left: calc(var(--j) * var(--cw, 400px) / var(--strips) * -1);
-    width: var(--cw, 400px); height: var(--ch, 256px); max-width: none; object-fit: cover;
-  }
-  .strip:first-child { border-radius: 6px 0 0 6px; }
-  .strip:last-child { border-radius: 0 6px 6px 0; }
-  /* A hovered side card comes partly out of the fade */
-  .card.is-hover .strip::after, .card:focus-visible .strip::after { opacity: calc(var(--fade, 0) * 0.4); }
-  .card:focus-visible { outline: none; }
-  @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
+  .no-gl .fallback img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 6px; }
+  .no-gl .fallback span { display: block; margin-top: 0.5rem; }
+  .no-gl .stage { overflow-y: auto; }
 
   @media (max-width: 760px) {
-    .ring { top: 40%; }
     .details { --span: 2; }
     .sheet dt, .sheet dd { padding: 0.3rem 0; }
   }
