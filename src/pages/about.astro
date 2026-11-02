@@ -95,22 +95,26 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
 
 <script>
   import { reduced } from '../scripts/smooth';
-  // Light up one interest at a time while nobody is hovering the list
-  const list = document.querySelector<HTMLElement>('.int-list');
-  const items = list ? [...list.querySelectorAll<HTMLElement>('.int')] : [];
-  if (list && items.length > 1 && !reduced()) {
-    let current = -1, paused = false;
-    list.addEventListener('pointerenter', () => { paused = true; items[current]?.classList.remove('lit'); });
-    list.addEventListener('pointerleave', () => (paused = false));
-    setInterval(() => {
-      if (paused || document.hidden) return;
-      items[current]?.classList.remove('lit');
-      let next = current;
-      while (next === current) next = Math.floor(Math.random() * items.length);
-      current = next;
-      items[current].classList.add('lit');
-    }, 1800);
-  }
+  import { onPage } from '../scripts/page';
+  onPage(() => {
+    // Light up one interest at a time while nobody is hovering the list
+    const list = document.querySelector<HTMLElement>('.int-list');
+    const items = list ? [...list.querySelectorAll<HTMLElement>('.int')] : [];
+    if (list && items.length > 1 && !reduced()) {
+      let current = -1, paused = false;
+      list.addEventListener('pointerenter', () => { paused = true; items[current]?.classList.remove('lit'); });
+      list.addEventListener('pointerleave', () => (paused = false));
+      const timer = setInterval(() => {
+        if (paused || document.hidden) return;
+        items[current]?.classList.remove('lit');
+        let next = current;
+        while (next === current) next = Math.floor(Math.random() * items.length);
+        current = next;
+        items[current].classList.add('lit');
+      }, 1800);
+      return () => clearInterval(timer);
+    }
+  });
 </script>
 
 <style>

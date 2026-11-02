@@ -76,17 +76,20 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
 
 <script>
   import { gsap, reduced } from '../../scripts/smooth';
-  if (!reduced()) {
-    gsap.from('.title', { yPercent: 40, opacity: 0, duration: 1.1, ease: 'expo.out' });
-    gsap.from('.facts > div', { y: 20, opacity: 0, duration: 0.9, ease: 'expo.out', stagger: 0.07, delay: 0.2 });
-    gsap.fromTo('.cover .frame', { clipPath: 'inset(10% 6% 10% 6% round 8px)' }, {
-      clipPath: 'inset(0% 0% 0% 0% round 8px)', ease: 'none',
-      scrollTrigger: { trigger: '.cover', start: 'top 85%', end: 'top 15%', scrub: true },
-    });
-    gsap.utils.toArray<HTMLElement>('.feature img').forEach((img) => {
-      gsap.fromTo(img, { yPercent: -6 }, { yPercent: 6, ease: 'none', scrollTrigger: { trigger: img.parentElement, scrub: true } });
-    });
-  }
+  import { onPage } from '../../scripts/page';
+  onPage(() => {
+    if (!reduced()) {
+      gsap.from('.title', { yPercent: 40, opacity: 0, duration: 1.1, ease: 'expo.out' });
+      gsap.from('.facts > div', { y: 20, opacity: 0, duration: 0.9, ease: 'expo.out', stagger: 0.07, delay: 0.2 });
+      gsap.fromTo('.cover .frame', { clipPath: 'inset(10% 6% 10% 6% round 8px)' }, {
+        clipPath: 'inset(0% 0% 0% 0% round 8px)', ease: 'none',
+        scrollTrigger: { trigger: '.cover', start: 'top 85%', end: 'top 15%', scrub: true },
+      });
+      gsap.utils.toArray<HTMLElement>('.feature img').forEach((img) => {
+        gsap.fromTo(img, { yPercent: -6 }, { yPercent: 6, ease: 'none', scrollTrigger: { trigger: img.parentElement, scrub: true } });
+      });
+    }
+  });
 </script>
 
 <style>

@@ -14,7 +14,9 @@ export function initCursor() {
     el.classList.toggle('is-view', !!t);
     if (t) label.textContent = t.dataset.cursor || 'view';
   });
-  window.addEventListener('cursor:label', ((e: CustomEvent<string | null>) => {
+  // The link under the cursor is gone after a page change
+  document.addEventListener('astro:after-swap', () => el.classList.remove('is-view'));
+  window.addEventListener('cursor:label',((e: CustomEvent<string | null>) => {
     el.classList.toggle('is-view', !!e.detail);
     if (e.detail) label.textContent = e.detail;
   }) as EventListener);
