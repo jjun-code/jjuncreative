@@ -38,11 +38,11 @@ const Tag = href ? 'a' : 'button';
   /* White fill that sweeps in from the badge on hover */
   .btn::before {
     content: ''; position: absolute; z-index: -1; inset: 3px; border-radius: inherit;
-    background: #fff; clip-path: circle(1.3rem at 1.5rem 50%);
+    background: var(--inverse); clip-path: circle(1.3rem at 1.5rem 50%);
     opacity: 0; transition: clip-path 0.6s var(--ease), opacity 0.2s;
   }
   .btn:hover::before, .btn:focus-visible::before { clip-path: circle(150% at 1.5rem 50%); opacity: 1; }
-  .btn:hover, .btn:focus-visible { color: #141414; }
+  .btn:hover, .btn:focus-visible { color: var(--inverse-ink); }
   .badge {
     flex: none; width: 2.5rem; height: 2.5rem; border-radius: 50%;
     display: grid; place-items: center; overflow: hidden;
@@ -55,10 +55,10 @@ const Tag = href ? 'a' : 'button';
 
   .accent { background: var(--accent); color: var(--accent-ink); }
   .accent .badge { background: var(--accent-ink); color: var(--accent); }
-  .accent:hover .badge, .accent:focus-visible .badge { background: var(--accent); color: #fff; }
+  .accent:hover .badge, .accent:focus-visible .badge { background: var(--accent); color: var(--accent-ink); }
 
-  .ghost { border: 1px solid #ffffff40; color: var(--ink); background: #ffffff0a; backdrop-filter: blur(6px); }
-  .ghost .badge { background: var(--ink); color: #141414; }
-  .ghost:hover, .ghost:focus-visible { border-color: #fff; }
-  .ghost:hover .badge, .ghost:focus-visible .badge { background: #141414; color: #fff; }
+  .ghost { border: 1px solid var(--line-strong); color: var(--ink); background: color-mix(in srgb, var(--panel) 40%, transparent); backdrop-filter: blur(6px); }
+  .ghost .badge { background: var(--ink); color: var(--bg); }
+  .ghost:hover, .ghost:focus-visible { border-color: var(--inverse); }
+  .ghost:hover .badge, .ghost:focus-visible .badge { background: var(--inverse-ink); color: var(--inverse); }
 </style>

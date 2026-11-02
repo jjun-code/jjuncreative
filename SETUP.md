@@ -54,11 +54,17 @@ Do the same for your portrait on the About page.
 ## Day-to-day editing
 
 - Go to **www.jjuncreative.com/keystatic** and sign in.
-- **Projects**: add, edit or reorder (use *Sort order*). Tick *Feature on home page* to put its images
-  on the rotating ring. Under *Project colour*, pick the colour that tints the top of its page.
-- **Home page / About page / Contact & site details**: all the text on those pages.
+- **Projects**: add, edit or reorder (use *Sort order*). Every project appears as a tile in the looping home page scroll,
+  in *Sort order*, showing its cover image. Under *Project colour*, pick its colour.
+- **About page / Contact & site details**: all the text on those pages. The home page shows only the
+  project scroll, so the *Home page* fields aren't used at the moment.
 - Hit **Save**. The site rebuilds itself and is live in about 2 minutes.
 
 ## Changing the look
 
 Colours and fonts live at the top of `src/styles/global.css`. Ask Claude to change them for you.
+
+## Fonts
+
+- **Overused Grotesk** (all text): free under the SIL Open Font License; the licence is in `public/fonts`.
+  To give headings their own typeface later, point `--font-display` in `src/styles/global.css` at it.

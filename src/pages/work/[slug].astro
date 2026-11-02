@@ -19,43 +19,41 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
 <Base title={w.title} description={w.summary} image={cover}>
   <!-- --tint is the project's charm colour, used as a soft glow -->
   <article class="case" style={`--tint:${w.charm.color}`}>
-    <header class="wrap top">
-      <div class="crumbs">
+    <header class="grid top">
+      <div class="crumbs c-full">
         <a href="/work" class="tag">← All work</a>
         <span class="num">{String(i + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
       </div>
-      <h1 class="h1 title">{w.title}</h1>
-      <div class="lede">
-        <p class="summary h3">{w.summary}</p>
-        <dl class="facts">
-          <div class="card"><dt class="label">Year</dt><dd>{w.year}</dd></div>
-          <div class="card"><dt class="label">Category</dt><dd>{w.category}</dd></div>
-          <div class="card"><dt class="label">Tools</dt><dd>{w.tools.join(', ')}</dd></div>
-        </dl>
-      </div>
+      <h1 class="h1 title c-full">{w.title}</h1>
+      <p class="summary h3 c-1">{w.summary}</p>
+      <dl class="facts c-3 sub">
+        <div><dt class="label">Year</dt><dd>{w.year}</dd></div>
+        <div><dt class="label">Category</dt><dd>{w.category}</dd></div>
+        <div><dt class="label">Tools</dt><dd>{w.tools.join(', ')}</dd></div>
+      </dl>
     </header>
 
     {cover && (
-      <figure class="cover wrap"><div class="frame"><img src={cover} alt={`${w.title} cover`} /></div></figure>
+      <figure class="cover grid"><div class="frame c-full"><img src={cover} alt={`${w.title} cover`} /></div></figure>
     )}
 
     {(w.problem || w.solution) && (
-      <section class="ps wrap">
-        {w.problem && <div class="card" data-reveal><p class="label">01. Problem</p><p>{w.problem}</p></div>}
-        {w.solution && <div class="card" data-reveal><p class="label">02. Solution</p><p>{w.solution}</p></div>}
+      <section class="ps grid">
+        {w.problem && <div class="c-2" data-reveal><p class="label">01. Problem</p><p>{w.problem}</p></div>}
+        {w.solution && <div class="c-2" data-reveal><p class="label">02. Solution</p><p>{w.solution}</p></div>}
       </section>
     )}
 
-    {w.intro && <p class="intro wrap h2" data-reveal>{w.intro}</p>}
+    {w.intro && <div class="grid"><p class="intro h2 c-last3" data-reveal>{w.intro}</p></div>}
 
-    {feature && <figure class="feature wrap"><div class="frame"><img src={feature} alt="" loading="lazy" /></div></figure>}
+    {feature && <figure class="feature grid"><div class="frame c-full"><img src={feature} alt="" loading="lazy" /></div></figure>}
 
-    {html && <div class="story wrap" set:html={html} />}
+    {html && <div class="grid"><div class="story c-last3" set:html={html} /></div>}
 
     {w.gallery.length > 0 && (
-      <section class="gallery wrap" aria-label="Gallery">
-        {w.gallery.map((g: any) => (
-          <figure data-reveal>
+      <section class="gallery grid" aria-label="Gallery">
+        {w.gallery.map((g: any, gi: number) => (
+          <figure class={gi === 0 ? 'c-full' : 'c-2'} data-reveal>
             <div class="frame"><img src={src(g, 2000)} alt={g.caption || ''} loading="lazy" /></div>
             {g.caption && <figcaption>{g.caption}</figcaption>}
           </figure>
@@ -63,8 +61,8 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
       </section>
     )}
 
-    <section class="wrap">
-      <a href={`/work/${next.slug}/`} class="next card" data-cursor="next">
+    <section class="grid">
+      <a href={`/work/${next.slug}/`} class="next card c-full" data-cursor="next">
         <div class="next-copy">
           <p class="label">Next project</p>
           <span class="h1">{next.title}</span>
@@ -97,61 +95,60 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
     content: ''; position: absolute; inset: 0 0 auto; height: 90svh; z-index: -1; pointer-events: none;
     background: radial-gradient(60% 70% at 80% 0%, color-mix(in srgb, var(--tint) 45%, transparent), transparent 70%);
   }
-  .top { padding-top: clamp(7rem, 13vw, 10rem); }
+  .top { padding-top: clamp(7rem, 13vw, 10rem); row-gap: 0; }
   .crumbs { display: flex; align-items: center; justify-content: space-between; }
-  .crumbs .tag:hover { color: var(--ink); border-color: #ffffff40; }
+  .crumbs .tag:hover { color: var(--ink); border-color: var(--line-strong); }
   .title { font-size: clamp(3rem, 1.5rem + 8vw, 10rem); margin: 2rem 0 2.5rem; overflow-wrap: anywhere; }
-  .lede { display: grid; grid-template-columns: 1.2fr 1fr; gap: 3rem; align-items: start; }
-  .summary { color: var(--mute); max-width: 24ch; margin: 0; }
-  .facts { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
-  .facts .card { padding: 1rem 1.1rem; border-radius: 16px; }
+  .summary { color: var(--mute); margin: 0; }
+  /* Facts sit one per column, each under a rule that starts on its grid line */
+  .facts { margin: 0; }
+  .facts > div { border-top: 1px solid var(--line); padding-top: 0.8rem; }
   .facts .label { margin-bottom: 0.4rem; }
   .facts dd { margin: 0; }
 
-  .frame { overflow: hidden; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+  .frame { overflow: hidden; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); padding: 0; }
   .frame img { width: 100%; }
   .cover { margin: clamp(3rem, 6vw, 5rem) 0 0; }
   .cover .frame { min-height: 30vh; }
 
-  .ps { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; padding-block: clamp(3rem, 7vw, 6rem); }
-  .ps .card { padding: clamp(1.4rem, 3vw, 2.2rem); }
-  .ps p:last-child { margin: 0; color: #cfcfcf; }
+  .ps { padding-block: clamp(3rem, 7vw, 6rem); row-gap: 2rem; }
+  .ps > div { border-top: 1px solid var(--line); padding-top: 0.9rem; }
+  .ps p:last-child { margin: 0; color: var(--body); max-width: 52ch; }
 
-  .intro { max-width: 26ch; margin: 0 0 clamp(4rem, 8vw, 7rem); }
+  .intro { margin: 0 0 clamp(4rem, 8vw, 7rem); }
 
   .feature { margin: 0 0 clamp(3rem, 7vw, 6rem); }
   .feature .frame { height: 80svh; }
-  .feature img { width: 100%; height: 115%; object-fit: cover; }
+  .feature img { height: 115%; object-fit: cover; }
 
-  .story { max-width: 62rem; margin-inline: auto; columns: 2 22rem; column-gap: 3rem; padding-bottom: clamp(3rem, 6vw, 5rem); color: #cfcfcf; }
+  .story { columns: 2 20rem; column-gap: calc(2 * var(--pad)); padding-bottom: clamp(3rem, 6vw, 5rem); color: var(--body); }
   .story :global(h2), .story :global(h3) { color: var(--ink); letter-spacing: -0.04em; margin: 1.5em 0 0.6em; }
   .story :global(p) { break-inside: avoid; }
-  .story :global(a) { color: var(--accent); }
+  .story :global(a) { color: var(--accent-text); }
   .story :global(img) { border-radius: var(--radius); margin: 1rem 0; column-span: all; }
 
-  .gallery { display: grid; gap: 0.75rem; padding-bottom: clamp(4rem, 8vw, 7rem); }
+  .gallery { row-gap: var(--gutter); padding-bottom: clamp(4rem, 8vw, 7rem); }
   .gallery figure { margin: 0; }
-  .gallery figcaption { font-size: var(--step--1); color: var(--mute); padding: 0.7rem 0 0 0.4rem; }
-  @media (min-width: 900px) {
-    .gallery { grid-template-columns: 1fr 1fr; }
-    .gallery figure:first-child { grid-column: 1 / -1; }
-  }
+  .gallery figcaption { font-size: var(--step--1); color: var(--mute); padding-top: 0.7rem; }
 
   .next {
     display: grid; grid-template-columns: 1fr minmax(0, 0.9fr); gap: 2rem; align-items: center;
     padding: clamp(1.4rem, 3vw, 2.4rem); overflow: hidden;
     transition: border-color 0.4s, background-color 0.4s;
   }
-  .next:hover { border-color: var(--accent); background: #231a16; }
+  .next:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
   .next .h1 { display: block; overflow-wrap: anywhere; transition: color 0.4s; }
-  .next:hover .h1 { color: var(--accent); }
+  .next:hover .h1 { color: var(--accent-text); }
   .next-meta { display: block; margin-top: 1rem; color: var(--mute); font-size: var(--step--1); }
   .next-img { border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 10; }
   .next-img img { width: 100%; height: 100%; object-fit: cover; transition: scale 0.8s var(--ease); }
   .next:hover .next-img img { scale: 1.05; }
 
   @media (max-width: 760px) {
-    .lede, .ps, .next { grid-template-columns: 1fr; }
-    .facts { grid-template-columns: 1fr 1fr; }
+    .summary { grid-column: 1 / -1; margin-bottom: 1.5rem; }
+    .facts { grid-column: 1 / -1; row-gap: 1rem; }
+    .facts > div:last-child { grid-column: 1 / -1; }
+    .ps > div, .gallery figure { grid-column: 1 / -1; }
+    .next { grid-template-columns: 1fr; }
   }
 </style>
