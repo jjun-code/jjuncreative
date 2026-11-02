@@ -1,16 +1,31 @@
 ---
 // First-visit loader. The logo fills from left to right while the fonts and
-// the first project images load, with a percentage and project names ticking
-// past, then the screen dissolves away in an ordered-dither sweep, the same
+// the first project images load, with a percentage and playful status lines
+// (nods to the interests on the About page) ticking past, then the screen dissolves away in an ordered-dither sweep, the same
 // dither as the background.
 // Shown once per browser session; Base sets html.is-loading before paint.
 import Logo from './Logo.astro';
-import { getWork } from '../lib/content';
-const work = await getWork();
-const names = work.map((w) => w.title);
+// A random handful of these shows on each visit
+const messages = [
+  'Developing the film',
+  'Checking the light meter',
+  'Warming up the tyres',
+  'Box, box, box',
+  'Dropping the needle',
+  'Flipping to side B',
+  'Winding the watch',
+  'Pulling an espresso shot',
+  'Chalking up',
+  'Pressing start',
+  'Respawning',
+  'Rolling camera',
+  'Rendering one more pass',
+  'Steaming the fit',
+  'Asking the robots nicely',
+];
 const year = new Date().getFullYear();
 ---
-<div class="loader" aria-hidden="true" data-names={JSON.stringify(names)}>
+<div class="loader" aria-hidden="true" data-names={JSON.stringify(messages)}>
   <canvas class="ld-veil"></canvas>
   <div class="ld-top mono">
     <span>jjuncreative</span>
@@ -21,7 +36,7 @@ const year = new Date().getFullYear();
     <div class="ld-fill"><Logo /></div>
   </div>
   <div class="ld-bottom mono">
-    <p class="ld-meta"><span class="ld-label">Loading</span> <span class="ld-name">{names[0]}</span></p>
+    <p class="ld-meta"><span class="ld-name">{messages[0]}</span>…</p>
     <p class="ld-count"><span>000</span>%</p>
   </div>
 </div>
@@ -58,7 +73,13 @@ const year = new Date().getFullYear();
     const name = el.querySelector<HTMLElement>('.ld-name')!;
     const mark = el.querySelector<HTMLElement>('.ld-mark')!;
     const veil = el.querySelector<HTMLCanvasElement>('.ld-veil')!;
-    const names: string[] = JSON.parse(el.dataset.names || '[]');
+    // Six random status lines for this visit
+    const names: string[] = JSON.parse(el.dataset.names || '[]')
+      .map((m: string) => [Math.random(), m] as const)
+      .sort((a: readonly [number, string], b: readonly [number, string]) => a[0] - b[0])
+      .slice(0, 6)
+      .map(([, m]: readonly [number, string]) => m);
+    if (names.length) name.textContent = names[0];
 
     // ── Progress: real loading, but never faster than MIN or slower than MAX ──
     const MIN = 1700, MAX = 4500, t0 = performance.now();
@@ -136,6 +157,5 @@ const year = new Date().getFullYear();
     display: flex; justify-content: space-between; align-items: end; gap: 1rem;
   }
   .ld-bottom p { margin: 0; max-width: none; }
-  .ld-label { color: var(--mute); }
   .ld-count { font-variant-numeric: tabular-nums; }
 </style>

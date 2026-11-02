@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import Loader from '../components/Loader.astro';
@@ -43,29 +44,41 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="preload" href="/fonts/OverusedGrotesk-VF.ttf" as="font" type="font/ttf" crossorigin />
+    <!-- Pages swap without a full reload, so the background music never stops -->
+    <ClientRouter />
   </head>
   <body>
     <Loader />
-    <canvas class="backdrop" aria-hidden="true"></canvas>
-    <div class="site-grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
-    <p class="coords mono" aria-hidden="true"><span class="cx">0000</span> X&nbsp;&nbsp;<span class="cy">0000</span> Y</p>
+    <canvas class="backdrop" aria-hidden="true" transition:persist="backdrop"></canvas>
+    <div class="site-grid" aria-hidden="true" transition:persist="site-grid"><i></i><i></i><i></i><i></i><i></i></div>
+    <p class="coords mono" aria-hidden="true" transition:persist="coords"><span class="cx">0000</span> X&nbsp;&nbsp;<span class="cy">0000</span> Y</p>
     <Nav />
     <main id="main">
       <slot />
     </main>
     {footer && <Footer site={site} cta={footerCta} />}
-    <div class="cursor" aria-hidden="true"><span>view</span></div>
+    <div class="cursor" aria-hidden="true" transition:persist="cursor"><span>view</span></div>
     <script>
       import { initSmooth } from '../scripts/smooth';
       import { initCursor } from '../scripts/cursor';
       import { initReveal } from '../scripts/reveal';
       import { initBackdrop } from '../scripts/backdrop';
       import { initCoords } from '../scripts/coords';
+      import { onPage } from '../scripts/page';
+      // These live outside the swapped page content, so they start once
       initSmooth();
       initBackdrop();
       initCoords();
       initCursor();
-      initReveal();
+      onPage(initReveal);
+
+      // The incoming page arrives without the theme the head script set on
+      // first load; carry it over before it's shown, so there's no flash
+      document.addEventListener('astro:before-swap', (e) => {
+        const theme = document.documentElement.dataset.theme;
+        if (theme) e.newDocument.documentElement.dataset.theme = theme;
+        e.newDocument.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f1f1ef' : '#141414');
+      });
     </script>
   </body>
 </html>

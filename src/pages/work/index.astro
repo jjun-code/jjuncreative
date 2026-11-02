@@ -33,13 +33,16 @@ const categories = [...new Set(work.map((w) => w.category).filter(Boolean))];
 </Base>
 
 <script>
-  const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
-  const items = [...document.querySelectorAll<HTMLElement>('.items > li')];
-  buttons.forEach((btn) => btn.addEventListener('click', () => {
-    const f = btn.dataset.filter;
-    buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
-    items.forEach((li) => { li.hidden = !!f && li.dataset.category !== f; });
-  }));
+  import { onPage } from '../../scripts/page';
+  onPage(() => {
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    const items = [...document.querySelectorAll<HTMLElement>('.items > li')];
+    buttons.forEach((btn) => btn.addEventListener('click', () => {
+      const f = btn.dataset.filter;
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      items.forEach((li) => { li.hidden = !!f && li.dataset.category !== f; });
+    }));
+  });
 </script>
 
 <style>

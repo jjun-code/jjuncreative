@@ -48,166 +48,180 @@ const { work } = Astro.props;
   import { gsap, reduced } from '../scripts/smooth';
   import { tick } from '../scripts/sound';
   import { attachDitherHover } from '../scripts/ditherHover';
+  import { onPage } from '../scripts/page';
 
-  const sec = document.querySelector<HTMLElement>('.projects');
-  if (sec) {
-    const tiles = [...sec.querySelectorAll<HTMLElement>('.tile')];
-    const sheets = [...sec.querySelectorAll<HTMLElement>('.sheet')];
-    const captions = [...sec.querySelectorAll<HTMLElement>('.caption')];
-    const n = tiles.length;
-    let active = 0;
-    const track = sec.querySelector<HTMLElement>('.track')!;
-    // Entrance plays as the loader dissolves, or straight away on later pages
-    const intro = () => {
-      if (reduced()) return;
-      gsap.timeline({ defaults: { ease: 'expo.out' } })
-        .from(track, { opacity: 0, scale: 0.85, y: 80, rotate: -4, duration: 1.8 }, 0)
-        .from(sec.querySelector('.details'), { y: 24, opacity: 0, duration: 1.2 }, 0.35);
-    };
-    if (document.documentElement.classList.contains('is-loading')) {
-      window.addEventListener('loader:reveal', intro, { once: true });
-    } else {
-      gsap.delayedCall(0.15, intro);
-    }
-
-    // Tiles ride a wheel pivoted off-screen at the bottom left. By distance k
-    // from the current position: k > 0 waits down the arc at the bottom right,
-    // k < 0 has rolled on up toward the top left. Each tile turns with the wheel.
-    // Signed distance from the current position, wrapped so the track loops:
-    // with five tiles, k runs from -2.5 to 2.5 and a tile re-enters on the
-    // far side once it has rolled out of view.
-    const wrap = (k: number) => ((((k + n / 2) % n) + n) % n) - n / 2;
-
-    // Phones get a straight horizontal row instead of the wheel; it loops
-    // the same way, and neighbours sit smaller and fainter either side
-    const phone = window.matchMedia('(max-width: 760px)');
-
-    const setActive = (a: number) => {
-      if (a === active) return;
-      active = a;
-      // Only the current tile keeps its hover effect
-      hovers.forEach((h, i) => i !== a && h?.leave());
-      tick();
-      sheets.forEach((s, i) => (s.hidden = i !== a));
-      captions.forEach((c, i) => (c.hidden = i !== a));
-      if (!reduced()) gsap.from([sheets[a], captions[a]], { y: 14, opacity: 0, duration: 0.6, ease: 'expo.out' });
-    };
-
-    const placeRow = (p: number) => {
-      const size = tiles[0]?.offsetWidth ?? 300;
-      const gap = size * 0.82; // neighbours are scaled down, so they can sit closer
-      tiles.forEach((d, i) => {
-        const k = wrap(i - p), ak = Math.abs(k);
-        const scale = 1 - Math.min(ak, 1) * 0.3;
-        // Fully visible in the middle, faint at the sides, gone before the wrap point
-        const fade = ak <= 1 ? 1 - ak * 0.7 : Math.max(0, 0.3 * (1.8 - ak) / 0.8);
-        d.style.transform = `translate3d(${k * gap}px, 0, 0) scale(${scale})`;
-        d.style.opacity = String(fade);
-        d.style.zIndex = String(100 - Math.round(ak * 10));
-        d.style.pointerEvents = ak < 0.5 ? 'auto' : 'none';
-      });
-    };
-
-    const place = (p: number) => {
-      if (phone.matches) placeRow(p);
-      else {
-        const W = window.innerWidth, H = window.innerHeight;
-        const size = tiles[0]?.offsetWidth ?? 400;
-        // Centre of the current tile, relative to the screen centre (see .tile top)
-        const cx = 0, cy = -0.04 * H;
-        const px = -0.45 * W, py = 0.95 * H;
-        const R = Math.hypot(cx - px, cy - py);
-        const a0 = Math.atan2(cy - py, cx - px);
-        const step = (size * 1.15) / R;
-        tiles.forEach((d, i) => {
-          const k = wrap(i - p);
-          const a = a0 + k * step;
-          const x = px + Math.cos(a) * R - cx, y = py + Math.sin(a) * R - cy;
-          // Tiles that have rolled past fade fast; waiting tiles fade in before
-          // the wrap point, so the jump from one end to the other is never seen
-          const fade = k < 0 ? Math.max(0, 1 + k * 0.8) : Math.max(0, 1 - Math.max(0, k - 1.3));
-          const scale = 1 - Math.min(Math.abs(k), 2) * 0.12;
-          d.style.transform =
-            `translate3d(${x}px, ${y}px, 0) rotateZ(${(k * step * 180) / Math.PI}deg) rotateX(10deg) scale(${scale})`;
-          d.style.opacity = String(fade);
-          d.style.zIndex = String(100 - Math.round(Math.abs(k) * 10));
-          d.style.pointerEvents = Math.abs(k) < 0.5 ? 'auto' : 'none';
-        });
-      }
-      setActive(((Math.round(p) % n) + n) % n);
-    };
-
-    // Wheel, trackpad, touch and arrow keys move a target position; the track
-    // eases toward it and, once input stops, settles on the nearest project.
-    let p = 0, target = 0, settle = 0, dragging = false;
-    const nudge = (d: number) => {
-      target += d;
-      clearTimeout(settle);
-      settle = window.setTimeout(() => { if (!dragging) target = Math.round(target); }, 140);
-    };
-    const go = (d: number) => { clearTimeout(settle); target = Math.round(target) + d; };
-
-    sec.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-      const px = e.deltaMode === 1 ? d * 40 : d;
-      nudge(Math.max(-0.5, Math.min(0.5, px / 700)));
-    }, { passive: false });
-
-    // Touch: on phones the row follows the finger sideways, and a quick flick
-    // moves on one project; elsewhere any swipe direction rolls the wheel
-    let touchY = 0, touchX = 0, vx = 0, lastT = 0, startIndex = 0;
-    sec.addEventListener('touchstart', (e) => {
-      touchY = e.touches[0].clientY; touchX = e.touches[0].clientX;
-      dragging = true; vx = 0; lastT = performance.now(); startIndex = Math.round(target);
-    }, { passive: true });
-    sec.addEventListener('touchmove', (e) => {
-      const t = e.touches[0];
-      const dy = touchY - t.clientY, dx = touchX - t.clientX;
-      const now = performance.now();
-      touchY = t.clientY; touchX = t.clientX;
-      if (phone.matches) {
-        const gap = (tiles[0]?.offsetWidth ?? 300) * 0.82;
-        vx = dx / Math.max(1, now - lastT);
-        target += dx / gap;
+  onPage(() => {
+    const sec = document.querySelector<HTMLElement>('.projects');
+    if (sec) {
+      // Listeners outside the section are removed when the page changes
+      const ac = new AbortController();
+      const { signal } = ac;
+      const tiles = [...sec.querySelectorAll<HTMLElement>('.tile')];
+      const sheets = [...sec.querySelectorAll<HTMLElement>('.sheet')];
+      const captions = [...sec.querySelectorAll<HTMLElement>('.caption')];
+      const n = tiles.length;
+      let active = 0;
+      const track = sec.querySelector<HTMLElement>('.track')!;
+      // Entrance plays as the loader dissolves, or straight away on later pages
+      const intro = () => {
+        if (reduced()) return;
+        gsap.timeline({ defaults: { ease: 'expo.out' } })
+          .from(track, { opacity: 0, scale: 0.85, y: 80, rotate: -4, duration: 1.8 }, 0)
+          .from(sec.querySelector('.details'), { y: 24, opacity: 0, duration: 1.2 }, 0.35);
+      };
+      if (document.documentElement.classList.contains('is-loading')) {
+        window.addEventListener('loader:reveal', intro, { once: true, signal });
       } else {
-        nudge((Math.abs(dy) > Math.abs(dx) ? dy : dx) / 260);
+        gsap.delayedCall(0.15, intro);
       }
-      lastT = now;
-    }, { passive: true });
-    sec.addEventListener('touchend', () => {
-      dragging = false;
-      if (!phone.matches) return;
-      // Settle on the nearest project; a quick flick that didn't drag far
-      // enough to change project still moves one in that direction
-      const landed = Math.round(target);
-      const flick = Math.abs(vx) > 0.35 ? Math.sign(vx) : 0;
-      target = landed === startIndex && flick ? startIndex + flick : landed;
-    });
 
-    window.addEventListener('keydown', (e) => {
-      const el = e.target instanceof Element ? e.target : null;
-      if (el?.closest('input, textarea, [contenteditable]')) return;
-      if (['ArrowDown', 'ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); go(1); }
-      if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(-1); }
-    });
+      // Tiles ride a wheel pivoted off-screen at the bottom left. By distance k
+      // from the current position: k > 0 waits down the arc at the bottom right,
+      // k < 0 has rolled on up toward the top left. Each tile turns with the wheel.
+      // Signed distance from the current position, wrapped so the track loops:
+      // with five tiles, k runs from -2.5 to 2.5 and a tile re-enters on the
+      // far side once it has rolled out of view.
+      const wrap = (k: number) => ((((k + n / 2) % n) + n) % n) - n / 2;
 
-    // Pixel dither sweep over the current tile's image on hover
-    const hovers = tiles.map((t) => {
-      const link = t.querySelector<HTMLElement>('a')!, img = link.querySelector('img');
-      return img ? attachDitherHover(link, img, reduced()) : null;
-    });
+      // Phones get a straight horizontal row instead of the wheel; it loops
+      // the same way, and neighbours sit smaller and fainter either side
+      const phone = window.matchMedia('(max-width: 760px)');
 
-    place(0);
-    gsap.ticker.add(() => {
-      if (Math.abs(target - p) < 0.0005) return;
-      // Follow the finger closely while dragging; ease more gently otherwise
-      p += (target - p) * (reduced() ? 1 : dragging ? 0.35 : 0.1);
-      place(p);
-    });
-    window.addEventListener('resize', () => place(p));
-    phone.addEventListener('change', () => place(p));
-  }
+      const setActive = (a: number) => {
+        if (a === active) return;
+        active = a;
+        // Only the current tile keeps its hover effect
+        hovers.forEach((h, i) => i !== a && h?.leave());
+        tick();
+        sheets.forEach((s, i) => (s.hidden = i !== a));
+        captions.forEach((c, i) => (c.hidden = i !== a));
+        if (!reduced()) gsap.from([sheets[a], captions[a]], { y: 14, opacity: 0, duration: 0.6, ease: 'expo.out' });
+      };
+
+      const placeRow = (p: number) => {
+        const size = tiles[0]?.offsetWidth ?? 300;
+        const gap = size * 0.82; // neighbours are scaled down, so they can sit closer
+        tiles.forEach((d, i) => {
+          const k = wrap(i - p), ak = Math.abs(k);
+          const scale = 1 - Math.min(ak, 1) * 0.3;
+          // Fully visible in the middle, faint at the sides, gone before the wrap point
+          const fade = ak <= 1 ? 1 - ak * 0.7 : Math.max(0, 0.3 * (1.8 - ak) / 0.8);
+          d.style.transform = `translate3d(${k * gap}px, 0, 0) scale(${scale})`;
+          d.style.opacity = String(fade);
+          d.style.zIndex = String(100 - Math.round(ak * 10));
+          d.style.pointerEvents = ak < 0.5 ? 'auto' : 'none';
+        });
+      };
+
+      const place = (p: number) => {
+        if (phone.matches) placeRow(p);
+        else {
+          const W = window.innerWidth, H = window.innerHeight;
+          const size = tiles[0]?.offsetWidth ?? 400;
+          // Centre of the current tile, relative to the screen centre (see .tile top)
+          const cx = 0, cy = -0.04 * H;
+          const px = -0.45 * W, py = 0.95 * H;
+          const R = Math.hypot(cx - px, cy - py);
+          const a0 = Math.atan2(cy - py, cx - px);
+          const step = (size * 1.15) / R;
+          tiles.forEach((d, i) => {
+            const k = wrap(i - p);
+            const a = a0 + k * step;
+            const x = px + Math.cos(a) * R - cx, y = py + Math.sin(a) * R - cy;
+            // Tiles that have rolled past fade fast; waiting tiles fade in before
+            // the wrap point, so the jump from one end to the other is never seen
+            const fade = k < 0 ? Math.max(0, 1 + k * 0.8) : Math.max(0, 1 - Math.max(0, k - 1.3));
+            const scale = 1 - Math.min(Math.abs(k), 2) * 0.12;
+            d.style.transform =
+              `translate3d(${x}px, ${y}px, 0) rotateZ(${(k * step * 180) / Math.PI}deg) rotateX(10deg) scale(${scale})`;
+            d.style.opacity = String(fade);
+            d.style.zIndex = String(100 - Math.round(Math.abs(k) * 10));
+            d.style.pointerEvents = Math.abs(k) < 0.5 ? 'auto' : 'none';
+          });
+        }
+        setActive(((Math.round(p) % n) + n) % n);
+      };
+
+      // Wheel, trackpad, touch and arrow keys move a target position; the track
+      // eases toward it and, once input stops, settles on the nearest project.
+      let p = 0, target = 0, settle = 0, dragging = false;
+      const nudge = (d: number) => {
+        target += d;
+        clearTimeout(settle);
+        settle = window.setTimeout(() => { if (!dragging) target = Math.round(target); }, 140);
+      };
+      const go = (d: number) => { clearTimeout(settle); target = Math.round(target) + d; };
+
+      sec.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+        const px = e.deltaMode === 1 ? d * 40 : d;
+        nudge(Math.max(-0.5, Math.min(0.5, px / 700)));
+      }, { passive: false });
+
+      // Touch: on phones the row follows the finger sideways, and a quick flick
+      // moves on one project; elsewhere any swipe direction rolls the wheel
+      let touchY = 0, touchX = 0, vx = 0, lastT = 0, startIndex = 0;
+      sec.addEventListener('touchstart', (e) => {
+        touchY = e.touches[0].clientY; touchX = e.touches[0].clientX;
+        dragging = true; vx = 0; lastT = performance.now(); startIndex = Math.round(target);
+      }, { passive: true });
+      sec.addEventListener('touchmove', (e) => {
+        const t = e.touches[0];
+        const dy = touchY - t.clientY, dx = touchX - t.clientX;
+        const now = performance.now();
+        touchY = t.clientY; touchX = t.clientX;
+        if (phone.matches) {
+          const gap = (tiles[0]?.offsetWidth ?? 300) * 0.82;
+          vx = dx / Math.max(1, now - lastT);
+          target += dx / gap;
+        } else {
+          nudge((Math.abs(dy) > Math.abs(dx) ? dy : dx) / 260);
+        }
+        lastT = now;
+      }, { passive: true });
+      sec.addEventListener('touchend', () => {
+        dragging = false;
+        if (!phone.matches) return;
+        // Settle on the nearest project; a quick flick that didn't drag far
+        // enough to change project still moves one in that direction
+        const landed = Math.round(target);
+        const flick = Math.abs(vx) > 0.35 ? Math.sign(vx) : 0;
+        target = landed === startIndex && flick ? startIndex + flick : landed;
+      });
+
+      window.addEventListener('keydown', (e) => {
+        const el = e.target instanceof Element ? e.target : null;
+        if (el?.closest('input, textarea, [contenteditable]')) return;
+        if (['ArrowDown', 'ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); go(1); }
+        if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(-1); }
+      }, { signal });
+
+      // Pixel dither sweep over the current tile's image on hover
+      const hovers = tiles.map((t) => {
+        const link = t.querySelector<HTMLElement>('a')!, img = link.querySelector('img');
+        return img ? attachDitherHover(link, img, reduced()) : null;
+      });
+
+      place(0);
+      const frame = () => {
+        if (Math.abs(target - p) < 0.0005) return;
+        // Follow the finger closely while dragging; ease more gently otherwise
+        p += (target - p) * (reduced() ? 1 : dragging ? 0.35 : 0.1);
+        place(p);
+      };
+      gsap.ticker.add(frame);
+      window.addEventListener('resize', () => place(p), { signal });
+      phone.addEventListener('change', () => place(p), { signal });
+
+      return () => {
+        ac.abort();
+        gsap.ticker.remove(frame);
+        clearTimeout(settle);
+        hovers.forEach((h) => h?.leave());
+      };
+    }
+  });
 </script>
 
 <style>

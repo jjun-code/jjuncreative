@@ -36,34 +36,38 @@ const [user] = site.email.split('@');
 
 <script>
   import { tick } from '../scripts/sound';
+  import { onPage } from '../scripts/page';
 
-  // Click the big email to copy it
-  document.querySelectorAll<HTMLButtonElement>('.big-mail').forEach((btn) => {
-    const text = btn.querySelector<HTMLElement>('.hint-text')!;
-    let reset = 0;
-    btn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(btn.dataset.copy!);
-        text.textContent = 'Copied to clipboard ✓';
-        btn.classList.add('copied');
-        tick();
-      } catch {
-        window.location.href = `mailto:${btn.dataset.copy}`;
-        return;
-      }
-      clearTimeout(reset);
-      reset = window.setTimeout(() => { text.textContent = 'Click to copy'; btn.classList.remove('copied'); }, 2200);
+  onPage(() => {
+    // Click the big email to copy it
+    document.querySelectorAll<HTMLButtonElement>('.big-mail').forEach((btn) => {
+      const text = btn.querySelector<HTMLElement>('.hint-text')!;
+      let reset = 0;
+      btn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(btn.dataset.copy!);
+          text.textContent = 'Copied to clipboard ✓';
+          btn.classList.add('copied');
+          tick();
+        } catch {
+          window.location.href = `mailto:${btn.dataset.copy}`;
+          return;
+        }
+        clearTimeout(reset);
+        reset = window.setTimeout(() => { text.textContent = 'Click to copy'; btn.classList.remove('copied'); }, 2200);
+      });
     });
-  });
 
-  // Live Auckland time
-  const clock = document.querySelector<HTMLElement>('.foot-clock');
-  if (clock) {
-    const fmt = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', hour12: false });
-    const tickClock = () => (clock.textContent = fmt.format(new Date()));
-    tickClock();
-    setInterval(tickClock, 15000);
-  }
+    // Live Auckland time
+    const clock = document.querySelector<HTMLElement>('.foot-clock');
+    if (clock) {
+      const fmt = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', hour12: false });
+      const tickClock = () => (clock.textContent = fmt.format(new Date()));
+      tickClock();
+      const timer = setInterval(tickClock, 15000);
+      return () => clearInterval(timer);
+    }
+  });
 </script>
 
 <style>
