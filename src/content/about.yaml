@@ -3,8 +3,7 @@ hello: >-
   I look at problems holistically, shaping solutions that connect user needs,
   business goals, and product strategy into one clear experience.
 portrait:
-  image: null
-  imageUrl: https://framerusercontent.com/images/6nET5X1aNIaxbAKtfN99UgbUD4.jpg
+  image: /images/about/portrait.jpg
 interests:
   - Photography
   - Motorsports
