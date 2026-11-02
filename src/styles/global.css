@@ -32,11 +32,16 @@
   --font: 'Overused Grotesk', 'Helvetica Neue', Arial, sans-serif;
   --font-display: var(--font); /* headings; swap for a display face if wanted */
 
+  /* Type scale. --step--2 is the caption size for small mono/meta text;
+     --step-4 and --step-5 are display sizes for the biggest type. */
+  --step--2: 0.72rem;
   --step--1: clamp(0.8rem, 0.78rem + 0.1vw, 0.875rem);
   --step-0: clamp(1rem, 0.97rem + 0.15vw, 1.0625rem);
   --step-1: clamp(1.25rem, 1.15rem + 0.45vw, 1.5rem);
   --step-2: clamp(1.75rem, 1.4rem + 1.4vw, 3rem);
   --step-3: clamp(2.4rem, 1.6rem + 3.4vw, 4.75rem);
+  --step-4: clamp(2.2rem, 1rem + 4.6vw, 5.75rem);
+  --step-5: clamp(3rem, 1.25rem + 7.75vw, 9.5rem);
 
   --gutter: clamp(1rem, 0.6rem + 1.6vw, 2.25rem);
   --cols: 4;              /* layout grid columns; drawn by .site-grid */
@@ -108,12 +113,12 @@ button { font: inherit; letter-spacing: inherit; color: inherit; background: non
 
 /* Small label above a section */
 .label { font-size: var(--step--1); color: var(--mute); letter-spacing: -0.01em; margin: 0 0 1rem; }
-.num { font-size: 0.75rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+.num { font-size: var(--step--2); color: var(--dim); font-variant-numeric: tabular-nums; }
 
 /* Small monospaced label, used for file-like captions */
 .mono {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 0.72rem; font-weight: 400; letter-spacing: 0.02em; line-height: 1.7; text-transform: uppercase;
+  font-size: var(--step--2); font-weight: 400; letter-spacing: 0.02em; line-height: 1.7; text-transform: uppercase;
 }
 
 /* Animated pixel field, fixed behind every page (scripts/pixels.ts) */
@@ -217,6 +222,6 @@ button:hover .roll > span, button:focus-visible .roll > span { transform: transl
 .cursor span {
   display: grid; place-items: center; width: 84px; height: 84px; margin: -42px 0 0 -42px;
   border-radius: 50%; background: var(--accent); color: var(--accent-ink);
-  font-size: 0.85rem; scale: 0; transition: scale 0.35s var(--ease);
+  font-size: var(--step--1); scale: 0; transition: scale 0.35s var(--ease);
 }
 .cursor.is-view span { scale: 1; }

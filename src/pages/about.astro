@@ -155,12 +155,12 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
   .int-list {
     list-style: none; margin: 0; display: flex; flex-wrap: wrap; align-items: baseline;
     column-gap: 0.25em; row-gap: 0.05em;
-    font-size: clamp(2.2rem, 1rem + 4.6vw, 5.75rem); font-weight: 500; letter-spacing: -0.055em; line-height: 1.02;
+    font-size: var(--step-4); font-weight: 500; letter-spacing: -0.055em; line-height: 1.02;
     border-top: 1px solid var(--line); padding-top: 1.2rem;
   }
   .int-list li { display: inline-flex; align-items: baseline; gap: 0.25em; }
   .int { position: relative; display: inline-flex; align-items: baseline; color: var(--dim); cursor: default; transition: color 0.35s; outline-offset: 0.1em; }
-  .int sup { font-size: 0.68rem; letter-spacing: 0.02em; color: var(--dim); margin-right: 0.35em; align-self: start; padding-top: 0.6em; transition: color 0.35s; }
+  .int sup { font-size: var(--step--2); letter-spacing: 0.02em; color: var(--dim); margin-right: 0.35em; align-self: start; padding-top: 0.6em; transition: color 0.35s; }
   .sep { color: var(--line-strong); font-weight: 300; }
   /* Square accent pixel that grows in when lit */
   .pip { width: 0; height: 0.18em; background: var(--accent); align-self: center; margin-right: 0; transition: width 0.45s var(--ease), margin 0.45s var(--ease); }

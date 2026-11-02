@@ -33,7 +33,7 @@ const { work } = Astro.props;
       {work.map((w: any, i: number) => {
         const art = src(w.cover, 1200) || src(w.inlineImage, 1200) || src(w.gallery[0], 1200);
         return (
-          <li class="tile" data-i={i} style={`--tint:${w.charm.color}`}>
+          <li class="tile" data-i={i} style={`--tint:${w.charm.color}; --i:${i}`}>
             <a href={`/work/${w.slug}/`} data-cursor="view" aria-label={w.title}>
               {art && <img src={art} alt="" crossorigin="anonymous" loading={i < 2 ? 'eager' : 'lazy'} />}
             </a>
@@ -228,12 +228,12 @@ const { work } = Astro.props;
   .sheet[hidden], .caption[hidden] { display: none; }
   .sheet .name {
     grid-column: 1 / -1; margin: 0 0 0.5rem; padding-bottom: 0.4rem; text-align: left;
-    font-family: var(--font-display); font-size: clamp(2rem, 1.4rem + 1.8vw, 3rem); letter-spacing: -0.05em; line-height: 1;
+    font-family: var(--font-display); font-size: var(--step-2); letter-spacing: -0.05em; line-height: 1;
     border-bottom: 1px solid var(--line);
   }
   .sheet dt, .sheet dd { padding: 0.45rem 0; border-bottom: 1px solid var(--line); }
-  .sheet dt { color: var(--mute); font-size: 0.62rem; padding-right: 1.5rem; align-self: stretch; display: flex; align-items: center; }
-  .sheet dd { margin: 0; text-align: right; font-size: 0.85rem; }
+  .sheet dt { color: var(--mute); font-size: var(--step--2); padding-right: 1.5rem; align-self: stretch; display: flex; align-items: center; }
+  .sheet dd { margin: 0; text-align: right; font-size: var(--step--1); }
   .tools { display: flex; flex-direction: column; align-items: end; }
 
 
@@ -250,7 +250,18 @@ const { work } = Astro.props;
     position: relative; display: block; width: 100%; height: 100%; border-radius: 6px; overflow: hidden;
     background: var(--tint);
     box-shadow: inset 0 0 0 1px #ffffff26, 0 40px 80px -30px #0009;
+    /* Constant gentle drift, on the link so it adds to the track's own
+       positioning; each tile starts at a different point so they never sync */
+    animation: float 7s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * -1.9s);
   }
+  @keyframes float {
+    0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+    25% { transform: translate3d(3px, -7px, 0) rotate(0.4deg); }
+    50% { transform: translate3d(0, -11px, 0) rotate(-0.2deg); }
+    75% { transform: translate3d(-3px, -5px, 0) rotate(-0.5deg); }
+  }
+  @media (prefers-reduced-motion: reduce) { .tile a { animation: none; } }
   .tile img { width: 100%; height: 100%; object-fit: cover; }
 
   /* Pixel dither layer over the image (scripts/ditherHover.ts) */
@@ -265,7 +276,6 @@ const { work } = Astro.props;
   @media (max-width: 760px) {
     .tile { --w: min(74vw, 24rem); top: 40%; }
     .details { --span: 2; }
-    .sheet .name { font-size: 1.9rem; }
     .sheet dt, .sheet dd { padding: 0.3rem 0; }
   }
 </style>
