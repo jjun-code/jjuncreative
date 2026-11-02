@@ -7,7 +7,7 @@ const [user] = site.email.split('@');
 ---
 <footer class="footer grid" id="contact">
   {cta && <>
-  <!-- The email, huge: letters roll to the accent on hover; click copies it -->
+  <!-- The email: letters roll to the accent on hover; click copies it -->
   <button class="big-mail c-full" data-copy={site.email} data-reveal aria-label={`Copy ${site.email}`}>
     <span class="mail" aria-hidden="true">
       {[...site.email].map((ch, j) => (
@@ -79,9 +79,9 @@ const [user] = site.email.split('@');
   }
   .mail {
     display: flex; flex-wrap: wrap;
-    /* Sized so the address spans the full grid width (it is about 9.45em wide) */
-    font-size: min(12rem, calc((100vw - 2 * var(--gutter) - 2 * var(--pad)) / 9.45));
-    font-weight: 500; letter-spacing: -0.06em; line-height: 1;
+    /* Section-heading size, like .h2 */
+    font-family: var(--font-display); font-size: var(--step-2);
+    font-weight: 500; letter-spacing: -0.05em; line-height: 1;
     color: var(--ink);
   }
   .ch { display: inline-block; height: 1em; overflow: hidden; }
