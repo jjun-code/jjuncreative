@@ -1,23 +1,31 @@
 ---
-import Button from './Button.astro';
 import Logo from './Logo.astro';
-const { site } = Astro.props;
+// cta: show the big email and contact details (off on case studies)
+const { site, cta = true } = Astro.props;
+// Letters after the @ start muted
+const [user] = site.email.split('@');
 ---
 <footer class="footer grid" id="contact">
-  <div class="cta-copy c-2" data-reveal>
-    <p class="label">Say hello</p>
-    <h2 class="h1">Got something in mind? <span class="mute">Let's make it together.</span></h2>
-  </div>
-  <div class="cta-side c-2" data-reveal>
-    <p class="avail"><span class="led" aria-hidden="true"></span>{site.availability}</p>
-    <div class="buttons">
-      <Button variant="accent" href={`mailto:${site.email}`} sub={site.email}>Email me</Button>
-      <Button data-copy={site.email}><span class="copy-text">Copy email</span></Button>
-    </div>
-    <ul class="socials">
-      {site.socials.map((s: any) => <li><a class="tag" href={s.url} target="_blank" rel="noopener">{s.label} ↗</a></li>)}
-    </ul>
-  </div>
+  {cta && <>
+  <!-- The email, huge: letters roll to the accent on hover; click copies it -->
+  <button class="big-mail c-full" data-copy={site.email} data-reveal aria-label={`Copy ${site.email}`}>
+    <span class="mail" aria-hidden="true">
+      {[...site.email].map((ch, j) => (
+        <span class={`ch${j >= user.length ? ' dom' : ''}`} style={`--j:${j}`}><span>{ch}</span><span>{ch}</span></span>
+      ))}
+    </span>
+    <span class="hint mono" aria-live="polite"><span class="pip" aria-hidden="true"></span><span class="hint-text">Click to copy</span></span>
+  </button>
+
+  <dl class="cells c-full sub" data-reveal>
+    <div><dt class="mono">Write</dt><dd><a href={`mailto:${site.email}`} class="sweep">Send an email ↗</a></dd></div>
+    {site.socials.map((s: any) => (
+      <div><dt class="mono">Elsewhere</dt><dd><a href={s.url} target="_blank" rel="noopener" class="sweep">{s.label} ↗</a></dd></div>
+    ))}
+    <div><dt class="mono">Local time</dt><dd><span class="foot-clock">--:--</span> <span class="dim">NZ</span></dd></div>
+    <div><dt class="mono">Based in</dt><dd>{site.location}</dd></div>
+  </dl>
+  </>}
 
   <div class="meta c-full sub">
     <span class="c-2">{site.location} · {site.coordinates}</span>
@@ -27,37 +35,77 @@ const { site } = Astro.props;
 </footer>
 
 <script>
-  document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((btn) => {
-    const text = btn.querySelector('.copy-text');
-    if (!text) return;
+  import { tick } from '../scripts/sound';
+
+  // Click the big email to copy it
+  document.querySelectorAll<HTMLButtonElement>('.big-mail').forEach((btn) => {
+    const text = btn.querySelector<HTMLElement>('.hint-text')!;
+    let reset = 0;
     btn.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(btn.dataset.copy!);
-        text.textContent = 'Copied';
+        text.textContent = 'Copied to clipboard ✓';
+        btn.classList.add('copied');
+        tick();
       } catch {
         window.location.href = `mailto:${btn.dataset.copy}`;
+        return;
       }
-      setTimeout(() => (text.textContent = 'Copy email'), 2000);
+      clearTimeout(reset);
+      reset = window.setTimeout(() => { text.textContent = 'Click to copy'; btn.classList.remove('copied'); }, 2200);
     });
   });
+
+  // Live Auckland time
+  const clock = document.querySelector<HTMLElement>('.foot-clock');
+  if (clock) {
+    const fmt = new Intl.DateTimeFormat('en-NZ', { timeZone: 'Pacific/Auckland', hour: '2-digit', minute: '2-digit', hour12: false });
+    const tickClock = () => (clock.textContent = fmt.format(new Date()));
+    tickClock();
+    setInterval(tickClock, 15000);
+  }
 </script>
 
 <style>
-  /* Footer sits on the page grid: message left half, actions right half */
-  .footer { padding-top: clamp(4rem, 10vw, 8rem); overflow: hidden; position: relative; align-items: end; row-gap: 2.5rem; }
-  .cta-copy { border-top: 1px solid var(--line); padding-top: 1rem; }
-  .cta-copy h2 { max-width: 13ch; }
-  .avail { display: flex; gap: 0.6rem; align-items: baseline; color: var(--mute); max-width: 34ch; }
-  .led { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: blink 2.4s steps(1) infinite; translate: 0 -1px; }
-  @keyframes blink { 50% { opacity: 0.25; } }
-  .buttons { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.5rem 0; }
-  .socials { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
-  .socials a:hover { color: var(--ink); border-color: var(--line-strong); }
-  .meta { padding-top: 1rem; border-top: 1px solid var(--line); font-size: var(--step--1); color: var(--dim); }
+  .footer { padding-top: clamp(4rem, 10vw, 8rem); overflow: hidden; position: relative; row-gap: 0; }
+
+  /* Big email */
+  .big-mail {
+    display: block; width: 100%; text-align: left; cursor: copy;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding-block: clamp(1rem, 2.5vw, 2rem) clamp(0.8rem, 2vw, 1.4rem);
+  }
+  .mail {
+    display: flex; flex-wrap: wrap;
+    /* Sized so the address spans the full grid width (it is about 9.45em wide) */
+    font-size: min(12rem, calc((100vw - 2 * var(--gutter) - 2 * var(--pad)) / 9.45));
+    font-weight: 500; letter-spacing: -0.06em; line-height: 1;
+    color: var(--ink);
+  }
+  .ch { display: inline-block; height: 1em; overflow: hidden; }
+  .ch > span { display: block; height: 1em; line-height: 1em; transition: transform 0.6s var(--ease); transition-delay: calc(var(--j) * 14ms); }
+  .ch > span:last-child { color: var(--accent-text); }
+  .ch.dom > span:first-child { color: var(--mute); }
+  .big-mail:hover .ch > span, .big-mail:focus-visible .ch > span, .big-mail.copied .ch > span { transform: translateY(-100%); }
+
+  .hint { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.9rem; color: var(--dim); transition: color 0.3s; }
+  .big-mail:hover .hint, .big-mail.copied .hint { color: var(--ink); }
+  .pip { width: 0.5rem; height: 0.5rem; background: var(--accent); scale: 0; transition: scale 0.4s var(--ease); }
+  .big-mail:hover .pip, .big-mail:focus-visible .pip, .big-mail.copied .pip { scale: 1; }
+
+  /* Info cells, one per grid column */
+  .cells { margin: clamp(1.5rem, 3vw, 2.5rem) 0 0; row-gap: 1.5rem; }
+  .cells > div { display: grid; gap: 0.4rem; align-content: start; }
+  .cells dt { color: var(--dim); }
+  .cells dd { margin: 0; }
+  .cells .dim { color: var(--dim); }
+  .foot-clock { font-variant-numeric: tabular-nums; }
+
+  .meta { margin-top: clamp(3rem, 7vw, 6rem); padding-top: 1rem; border-top: 1px solid var(--line); font-size: var(--step--1); color: var(--dim); }
   .meta span:last-child { text-align: right; }
-  .footer :global(.foot-logo) { width: 100%; padding-bottom: 1.6rem; }
+  .footer :global(.foot-logo) { width: 100%; padding-block: 2.5rem 1.6rem; }
+
   @media (max-width: 760px) {
-    .cta-copy, .cta-side { grid-column: 1 / -1; }
     .meta span { grid-column: 1 / -1; text-align: left !important; }
   }
 </style>

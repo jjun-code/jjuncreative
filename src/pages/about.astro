@@ -1,9 +1,18 @@
 ---
 import Base from '../layouts/Base.astro';
-import DotArt from '../components/DotArt.astro';
+import { siFigma, siFramer, siNotion, siClaude, siSteam } from 'simple-icons';
 import { reader, src } from '../lib/content';
 const a = (await reader.singletons.about.read())!;
 const portrait = src(a.portrait, 1200);
+// Brand logos for the toolkit, matched on the tool's first word (Simple Icons, CC0).
+// Anything without a logo (e.g. Adobe, which doesn't allow its marks to be
+// redistributed) falls back to a two-letter monogram.
+const logos: Record<string, { path: string; hex: string }> = {
+  figma: siFigma, framer: siFramer, notion: siNotion, claude: siClaude, steam: siSteam,
+};
+const logoFor = (name: string) => logos[name.toLowerCase().split(/\s+/)[0]];
+// Black brand colours would vanish on the dark theme, so they use the text colour
+const brand = (hex: string) => (hex === '000000' || hex === '191919' ? 'var(--ink)' : `#${hex}`);
 // Split the headline after its first sentence or comma for the two-tone treatment
 const m = a.headline.match(/^(.+?[.,])\s+(.+)$/);
 const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
@@ -45,10 +54,14 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
   <section class="grid block" aria-labelledby="kit-title">
     <h2 id="kit-title" class="h2 c-full" data-reveal>Toolkit. <span class="mute">What I use every day.</span></h2>
     <ul class="kit c-full sub">
-      {a.toolkit.map((t, i) => (
+      {a.toolkit.map((t) => (
         <li data-reveal>
-          <div class="tool card has-art">
-            <div class="art"><DotArt variant={i} /></div>
+          <div class="tool card" style={logoFor(t.name) ? `--brand:${brand(logoFor(t.name)!.hex)}` : undefined}>
+            <div class="art">
+              {logoFor(t.name)
+                ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d={logoFor(t.name)!.path} /></svg>
+                : <span class="mono-mark" aria-hidden="true">{t.name.slice(0, 2)}</span>}
+            </div>
             <strong>{t.name}</strong>
             <span>{t.use}</span>
           </div>
@@ -57,13 +70,48 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
     </ul>
   </section>
 
-  <section class="grid block" aria-labelledby="curios-title">
-    <h2 id="curios-title" class="h2 c-full" data-reveal>Off the clock. <span class="mute">Things I collect.</span></h2>
-    <ul class="curios c-3" data-reveal>
-      {a.interests.map((i) => <li class="tag">{i}</li>)}
+  <section class="grid block interests" aria-labelledby="curios-title">
+    <h2 id="curios-title" class="h2 c-3" data-reveal>Off the clock. <span class="mute">Interests that inspire me.</span></h2>
+    <p class="int-count mono c-1" data-reveal>({String(a.interests.length).padStart(2, '0')}) interests</p>
+    <!-- One flowing line of large type; a word lights up on hover, and one at a
+         time lights up by itself every couple of seconds -->
+    <ul class="int-list c-full" data-reveal>
+      {a.interests.map((it, i) => (
+        <li>
+          <span class="int" tabindex="0">
+            <sup class="mono">{String(i + 1).padStart(2, '0')}</sup>
+            <span class="pip" aria-hidden="true"></span>
+            <span class="word" aria-hidden="true">
+              {[...it].map((ch, j) => <span class="ch" style={`--j:${j}`}><span>{ch === ' ' ? '\u00a0' : ch}</span><span>{ch === ' ' ? '\u00a0' : ch}</span></span>)}
+            </span>
+            <span class="visually-hidden">{it}</span>
+          </span>
+          {i < a.interests.length - 1 && <span class="sep" aria-hidden="true">/</span>}
+        </li>
+      ))}
     </ul>
   </section>
 </Base>
+
+<script>
+  import { reduced } from '../scripts/smooth';
+  // Light up one interest at a time while nobody is hovering the list
+  const list = document.querySelector<HTMLElement>('.int-list');
+  const items = list ? [...list.querySelectorAll<HTMLElement>('.int')] : [];
+  if (list && items.length > 1 && !reduced()) {
+    let current = -1, paused = false;
+    list.addEventListener('pointerenter', () => { paused = true; items[current]?.classList.remove('lit'); });
+    list.addEventListener('pointerleave', () => (paused = false));
+    setInterval(() => {
+      if (paused || document.hidden) return;
+      items[current]?.classList.remove('lit');
+      let next = current;
+      while (next === current) next = Math.floor(Math.random() * items.length);
+      current = next;
+      items[current].classList.add('lit');
+    }, 1800);
+  }
+</script>
 
 <style>
   .intro { padding-top: clamp(8rem, 16vw, 12rem); }
@@ -90,17 +138,49 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
   .kit { list-style: none; margin: 0; row-gap: 1rem; }
   .tool { padding: 1rem; display: grid; gap: 0.2rem; height: 100%; transition: border-color 0.35s; }
   .tool:hover { border-color: var(--line-strong); }
-  .tool .art { background: var(--well); border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem; margin-bottom: 0.8rem; }
-  .tool span { color: var(--mute); font-size: var(--step--1); }
+  /* Logo well: the mark in the text colour, switching to its brand colour on hover */
+  .tool .art {
+    display: grid; place-items: center; aspect-ratio: 16 / 9; margin-bottom: 0.8rem;
+    background: var(--well); border: 1px solid var(--line); border-radius: 4px; color: var(--ink);
+  }
+  .tool .art svg { width: clamp(2rem, 1.4rem + 1.4vw, 2.75rem); height: auto; fill: currentColor; transition: fill 0.35s, transform 0.5s var(--ease); }
+  .tool:hover .art svg { fill: var(--brand, var(--ink)); transform: scale(1.08); }
+  .tool .mono-mark { color: inherit; font-size: clamp(1.6rem, 1rem + 1.4vw, 2.4rem); font-weight: 600; letter-spacing: -0.06em; line-height: 1; }
+  .tool > span { color: var(--mute); font-size: var(--step--1); }
 
-  .curios { list-style: none; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
-  .curios .tag { font-size: var(--step-0); padding: 0.5rem 1.1rem; color: var(--ink); background: var(--panel); transition: background-color 0.3s, color 0.3s; }
-  .curios .tag:hover { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+  /* Interests: big flowing type, dim until lit */
+  .interests { padding-bottom: clamp(2rem, 5vw, 4rem); }
+  .interests h2 { align-self: end; }
+  .int-count { margin: 0 0 clamp(1.5rem, 3vw, 2.5rem); align-self: end; justify-self: end; color: var(--dim); }
+  .int-list {
+    list-style: none; margin: 0; display: flex; flex-wrap: wrap; align-items: baseline;
+    column-gap: 0.25em; row-gap: 0.05em;
+    font-size: clamp(2.2rem, 1rem + 4.6vw, 5.75rem); font-weight: 500; letter-spacing: -0.055em; line-height: 1.02;
+    border-top: 1px solid var(--line); padding-top: 1.2rem;
+  }
+  .int-list li { display: inline-flex; align-items: baseline; gap: 0.25em; }
+  .int { position: relative; display: inline-flex; align-items: baseline; color: var(--dim); cursor: default; transition: color 0.35s; outline-offset: 0.1em; }
+  .int sup { font-size: 0.68rem; letter-spacing: 0.02em; color: var(--dim); margin-right: 0.35em; align-self: start; padding-top: 0.6em; transition: color 0.35s; }
+  .sep { color: var(--line-strong); font-weight: 300; }
+  /* Square accent pixel that grows in when lit */
+  .pip { width: 0; height: 0.18em; background: var(--accent); align-self: center; margin-right: 0; transition: width 0.45s var(--ease), margin 0.45s var(--ease); }
+
+  /* Letter roll into the accent colour */
+  .word { display: inline-flex; }
+  .ch { display: inline-block; height: 1.02em; overflow: hidden; }
+  .ch > span { display: block; height: 1.02em; line-height: 1.02em; transition: transform 0.55s var(--ease); transition-delay: calc(var(--j) * 18ms); }
+  .ch > span:last-child { color: var(--accent-text); }
+
+  .int:hover, .int:focus-visible, .int.lit { color: var(--ink); }
+  .int:hover sup, .int:focus-visible sup, .int.lit sup { color: var(--accent-text); }
+  .int:hover .pip, .int:focus-visible .pip, .int.lit .pip { width: 0.18em; margin-right: 0.18em; }
+  .int:hover .ch > span, .int:focus-visible .ch > span, .int.lit .ch > span { transform: translateY(-100%); }
 
   @media (max-width: 760px) {
     .split { row-gap: 2rem; }
     .portrait, .hello { grid-column: 1 / -1; }
     .stats { grid-template-columns: 1fr; }
     .exp .role { grid-column: 1 / -1; margin-top: 0.4rem; }
+    .interests h2, .int-count { grid-column: 1 / -1; justify-self: start; }
   }
 </style>

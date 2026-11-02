@@ -16,7 +16,7 @@ const cover = src(w.cover, 2400);
 const feature = src(w.inlineImage, 2000);
 const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(next.gallery[0], 1200);
 ---
-<Base title={w.title} description={w.summary} image={cover}>
+<Base title={w.title} description={w.summary} image={cover} footerCta={false}>
   <!-- --tint is the project's charm colour, used as a soft glow -->
   <article class="case" style={`--tint:${w.charm.color}`}>
     <header class="grid top">
@@ -79,8 +79,8 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
   if (!reduced()) {
     gsap.from('.title', { yPercent: 40, opacity: 0, duration: 1.1, ease: 'expo.out' });
     gsap.from('.facts > div', { y: 20, opacity: 0, duration: 0.9, ease: 'expo.out', stagger: 0.07, delay: 0.2 });
-    gsap.fromTo('.cover .frame', { clipPath: 'inset(10% 6% 10% 6% round 28px)' }, {
-      clipPath: 'inset(0% 0% 0% 0% round 28px)', ease: 'none',
+    gsap.fromTo('.cover .frame', { clipPath: 'inset(10% 6% 10% 6% round 8px)' }, {
+      clipPath: 'inset(0% 0% 0% 0% round 8px)', ease: 'none',
       scrollTrigger: { trigger: '.cover', start: 'top 85%', end: 'top 15%', scrub: true },
     });
     gsap.utils.toArray<HTMLElement>('.feature img').forEach((img) => {
@@ -140,7 +140,7 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
   .next .h1 { display: block; overflow-wrap: anywhere; transition: color 0.4s; }
   .next:hover .h1 { color: var(--accent-text); }
   .next-meta { display: block; margin-top: 1rem; color: var(--mute); font-size: var(--step--1); }
-  .next-img { border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 10; }
+  .next-img { border-radius: 6px; overflow: hidden; aspect-ratio: 16 / 10; }
   .next-img img { width: 100%; height: 100%; object-fit: cover; transition: scale 0.8s var(--ease); }
   .next:hover .next-img img { scale: 1.05; }
 
