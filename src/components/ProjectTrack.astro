@@ -20,16 +20,17 @@ const data = work.map((w: any) => ({
     <div class="details" aria-live="polite">
       {work.map((w: any, i: number) => (
         <div class="entry" data-i={i} hidden>
-          <dl class="sheet">
-            <dt class="visually-hidden">Project</dt>
-            <dd class="name">{w.title}</dd>
-            <dt class="mono">Category</dt><dd>{w.category}</dd>
-            <dt class="mono">Year</dt><dd>{w.year}</dd>
-            {w.tools.length > 0 && <><dt class="mono">Tools</dt><dd class="tools">{w.tools.map((t: string) => <span>{t}</span>)}</dd></>}
-          </dl>
-          <div class="caption">
-            <p class="mono">{w.summary}</p>
-            <a href={`/work/${w.slug}/`} class="mono view">View project <span aria-hidden="true">→</span></a>
+          <h2 class="name">{w.title}</h2>
+          <div class="info">
+            <dl class="sheet">
+              <dt class="mono">Category</dt><dd>{w.category}</dd>
+              <dt class="mono">Year</dt><dd>{w.year}</dd>
+              {w.tools.length > 0 && <><dt class="mono">Tools</dt><dd class="tools">{w.tools.map((t: string) => <span>{t}</span>)}</dd></>}
+            </dl>
+            <div class="caption">
+              <p class="mono">{w.summary}</p>
+              <a href={`/work/${w.slug}/`} class="mono view">View project <span aria-hidden="true">→</span></a>
+            </div>
           </div>
         </div>
       ))}
@@ -50,12 +51,100 @@ const data = work.map((w: any) => ({
 
 <script>
   import { gsap, reduced } from '../scripts/smooth';
-  import { tick } from '../scripts/sound';
+  import { tick, hum } from '../scripts/sound';
   import { onPage } from '../scripts/page';
   import { createGallery, project, type View, type CardDraw } from '../scripts/gallery';
   import { navigate } from 'astro:transitions/client';
 
   type Project = { slug: string; title: string; img: string; tint: string };
+
+  // ── Geometry (pure, so it can also place a card before the page starts) ──
+  type Geo = { view: View; slots: number; step: number; arc: number; radPerPx: number };
+  const geometry = (W: number, H: number, n: number): Geo => {
+    const phone = W < 760;
+    // The middle card is about 2.1× cw tall. On desktop that's 44% of the
+    // screen height (as on exp.fiddle.digital); on phones it must end above
+    // the details panel
+    const cw = phone ? Math.min(W * 0.46, H * 0.2) : Math.min(W * 0.15, H * 0.207);
+    const ch = cw * 1.42, gap = cw * 0.06; // ch: portrait height at the front
+    const R = phone ? W * 1.1 : W * 0.95;
+    const slots = n * Math.max(1, Math.round((2 * Math.PI * R) / (cw + gap) / n));
+    const step = (2 * Math.PI) / slots;
+    // Vanishing point just under the cards' top edge: the tops stay nearly level
+    // while cards nearer the middle hang lower and larger, as on a curved shelf
+    // (cy puts the common top line 20% down the screen on desktop, 15% on
+    // phones, leaving room for the middle card, which hangs lowest)
+    const view = { W, H, R, cw, ch, P: 1100, horizon: ch * 0.47, cy: H * (phone ? 0.15 : 0.2) + ch / 2 };
+    return { view, slots, step, arc: step * (cw / (cw + gap)), radPerPx: step / (cw + gap) };
+  };
+  // Angle of a slot relative to the front, in -π..π
+  const relAngle = (g: Geo, s: number, theta: number) => {
+    const a = (s * g.step + theta) % (2 * Math.PI);
+    return ((a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+  };
+  // ── Card shape by position ──
+  // f is 1 for the card at the middle, falling smoothly to ~0 by its
+  // neighbours. Cards there grow up to 50% larger and stretch from square to
+  // portrait; their spacing grows with them (the angle is the integral of the
+  // size), so gaps stay even and nothing overlaps.
+  const erf = (x: number) => {
+    const t = 1 / (1 + 0.3275911 * Math.abs(x));
+    const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
+    return Math.sign(x) * y;
+  };
+  const GROW = 0.5;
+  const shapeOf = (g: Geo, a0: number) => {
+    const sigma = g.step * 1.4;
+    const f = Math.exp(-((a0 / sigma) ** 2));
+    const k = 1 + GROW * f;
+    return {
+      angle: a0 + GROW * sigma * (Math.sqrt(Math.PI) / 2) * erf(a0 / sigma),
+      arc: g.arc * k,
+      cw: g.view.cw * k,
+      ch: k * (g.view.cw + (g.view.ch - g.view.cw) * f),
+    };
+  };
+
+  // ── Card ↔ cover morph ──
+  // A copy of a card's image, laid exactly over the card and named like the
+  // project page's cover, lets the page change morph one into the other
+  // (browsers without view transitions just fade)
+  const coverStandIn = (g: Geo, s: number, theta: number, src: string) => {
+    const c = shapeOf(g, relAngle(g, s, theta));
+    const pts = [0, 1].flatMap((u) => [0, 1].map((v) => project(g.view, c.angle, c.arc, u, v, c.ch)));
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = '';
+    Object.assign(img.style, {
+      position: 'fixed', zIndex: '80', pointerEvents: 'none', objectFit: 'cover', borderRadius: '6px',
+      left: `${Math.min(...xs)}px`, top: `${Math.min(...ys)}px`,
+      width: `${Math.max(...xs) - Math.min(...xs)}px`, height: `${Math.max(...ys) - Math.min(...ys)}px`,
+      viewTransitionName: 'project-cover',
+    });
+    document.body.append(img);
+    return img;
+  };
+
+  // Kept across page changes: where the row was, and which card was opened,
+  // so coming back lands in the same place and the cover can shrink back into
+  // its card
+  const memory = { theta: 0, visited: false, slot: -1, slug: '' };
+  // Forget the opened card unless this is the trip straight back home from its
+  // project (the trip out, from home, keeps it)
+  document.addEventListener('astro:before-preparation', (e) => {
+    const { from, to } = e as unknown as { from: URL; to: URL };
+    if (memory.slot < 0 || from.pathname === '/') return;
+    if (!(from.pathname.startsWith(`/work/${memory.slug}`) && to.pathname === '/')) memory.slot = -1;
+  });
+  document.addEventListener('astro:after-swap', () => {
+    const sec = document.querySelector<HTMLElement>('.projects');
+    if (memory.slot < 0 || !sec) return;
+    const data: Project[] = JSON.parse(sec.dataset.projects!);
+    const g = geometry(window.innerWidth, window.innerHeight, data.length);
+    coverStandIn(g, memory.slot, memory.theta, data[memory.slot % data.length].img).dataset.returning = '';
+    memory.slot = -1;
+  });
 
   onPage(() => {
     const sec = document.querySelector<HTMLElement>('.projects');
@@ -80,23 +169,11 @@ const data = work.map((w: any) => ({
     const mobile = window.matchMedia('(hover: none), (max-width: 760px)');
 
     // ── Layout: card size from the viewport, ring sized to fit whole projects ──
-    let view: View, slots = 0, step = 0, arc = 0, radPerPx = 0;
+    let g: Geo, view: View, slots = 0, step = 0, radPerPx = 0;
     let labels: HTMLElement[] = [];
     const layout = () => {
-      const W = window.innerWidth, H = window.innerHeight, phone = W < 760;
-      // On phones the middle card (about 2.1× cw tall) must end above the details panel
-      const cw = phone ? Math.min(W * 0.46, H * 0.2) : Math.min(W * 0.2, H * 0.33);
-      const ch = cw * 1.42, gap = cw * 0.06; // ch: portrait height at the front
-      const R = phone ? W * 1.1 : W * 0.95;
-      slots = n * Math.max(1, Math.round((2 * Math.PI * R) / (cw + gap) / n));
-      step = (2 * Math.PI) / slots;
-      arc = step * (cw / (cw + gap));
-      radPerPx = step / (cw + gap);
-      // Vanishing point just under the cards' top edge: the tops stay nearly level
-      // while cards nearer the middle hang lower and larger, as on a curved shelf
-      // (cy puts the common top line 15% down the screen, leaving room for the
-      // middle card, which hangs lowest)
-      view = { W, H, R, cw, ch, P: 1100, horizon: ch * 0.47, cy: H * 0.15 + ch / 2 };
+      g = geometry(window.innerWidth, window.innerHeight, n);
+      ({ view, slots, step, radPerPx } = g);
       labelsBox.textContent = '';
       labels = Array.from({ length: slots }, (_, s) => {
         const el = document.createElement('span');
@@ -133,7 +210,11 @@ const data = work.map((w: any) => ({
 
     // ── Motion: a slow constant drift, plus spin from input that coasts out ──
     // theta and vel are in radians; step is the angle from one card to the next
-    let theta = 0, vel = 0, drift = 1, dragging = false, lastInput = -1e9;
+    // Coming back picks up where the row was left (the drift holds briefly so
+    // the cover can land on its card first)
+    const returning = memory.visited;
+    let theta = returning ? memory.theta : 0, vel = 0, drift = returning ? 0 : 1, dragging = false, lastInput = -1e9;
+    const holdUntil = returning ? performance.now() + 900 : 0;
     const spun = () => (lastInput = performance.now());
 
     sec.addEventListener('wheel', (e) => {
@@ -167,7 +248,7 @@ const data = work.map((w: any) => ({
       const t = e.changedTouches[0];
       if (moved < 8 && t && e.target === canvas) {
         const hit = cardAt(t.clientX, t.clientY);
-        if (hit >= 0) navigate(`/work/${data[hit % n].slug}/`);
+        if (hit >= 0) open(hit);
       }
     });
 
@@ -179,11 +260,8 @@ const data = work.map((w: any) => ({
       if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); vel += step * 3; spun(); }
     }, { signal });
 
-    // Angle of a slot relative to the front, in -π..π
-    const rel = (s: number) => {
-      const a = (s * step + theta) % (2 * Math.PI);
-      return ((a + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
-    };
+    const rel = (s: number) => relAngle(g, s, theta);
+    const shape = (a0: number) => shapeOf(g, a0);
 
     // ── Hover: which card is under a point (front-most first) ──
     const inQuad = (x: number, y: number, q: [number, number][]) => {
@@ -194,28 +272,6 @@ const data = work.map((w: any) => ({
         if (c !== 0) { if (sign && Math.sign(c) !== sign) return false; sign = Math.sign(c); }
       }
       return true;
-    };
-    // ── Card shape by position ──
-    // f is 1 for the card at the middle, falling smoothly to ~0 by its
-    // neighbours. Cards there grow up to 50% larger and stretch from square to
-    // portrait; their spacing grows with them (the angle is the integral of the
-    // size), so gaps stay even and nothing overlaps.
-    const erf = (x: number) => {
-      const t = 1 / (1 + 0.3275911 * Math.abs(x));
-      const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x);
-      return Math.sign(x) * y;
-    };
-    const GROW = 0.5;
-    const shape = (a0: number) => {
-      const sigma = step * 1.4;
-      const f = Math.exp(-((a0 / sigma) ** 2));
-      const k = 1 + GROW * f;
-      return {
-        angle: a0 + GROW * sigma * (Math.sqrt(Math.PI) / 2) * erf(a0 / sigma),
-        arc: arc * k,
-        cw: view.cw * k,
-        ch: k * (view.cw + (view.ch - view.cw) * f),
-      };
     };
     const cardAt = (x: number, y: number) => {
       const order = Array.from({ length: slots }, (_, s) => s)
@@ -228,6 +284,17 @@ const data = work.map((w: any) => ({
       }
       return -1;
     };
+    // ── Opening a project: the card morphs into the project's cover ──
+    const open = (s: number) => {
+      coverStandIn(g, s, theta, data[s % n].img);
+      Object.assign(memory, { slot: s, slug: data[s % n].slug, theta });
+      // Quiet the rest of the page as it goes
+      gsap.to([labelsBox, details], { opacity: 0, duration: 0.2 });
+      vel = 0; hovered = -1;
+      hum();
+      navigate(`/work/${data[s % n].slug}/`);
+    };
+
     let mx = 0, my = 0, mouseIn = false, hovered = -1;
     const setHover = (s: number) => {
       if (s === hovered) return;
@@ -241,15 +308,15 @@ const data = work.map((w: any) => ({
       mx = e.clientX; my = e.clientY; mouseIn = true;
     });
     canvas.addEventListener('pointerleave', () => { mouseIn = false; setHover(-1); });
-    canvas.addEventListener('click', () => { if (hovered >= 0) navigate(`/work/${data[hovered % n].slug}/`); });
+    canvas.addEventListener('click', () => { if (hovered >= 0) open(hovered); });
 
     // ── Frame ──
     const frame = (_t: number, dtMs: number) => {
       const dt = Math.min(dtMs, 50) / 1000;
       // A slow drift that eases off while a card is hovered, so it holds still to read
-      drift += ((hovered >= 0 || rm ? 0 : 1) - drift) * Math.min(1, dt * 4);
+      drift += ((hovered >= 0 || rm || performance.now() < holdUntil ? 0 : 1) - drift) * Math.min(1, dt * 4);
       if (!dragging) {
-        theta += (-0.3 * step * drift + vel) * dt;
+        theta += (-0.15 * step * drift + vel) * dt;
         vel *= Math.exp(-3 * dt);
         if (Math.abs(vel) < 1e-5) vel = 0;
       }
@@ -294,7 +361,7 @@ const data = work.map((w: any) => ({
 
     // Entrance plays as the loader dissolves, or straight away on later pages
     const intro = () => {
-      if (rm) return;
+      if (rm || returning) return;
       gsap.fromTo([canvas, labelsBox], { opacity: 0 }, { opacity: 1, duration: 1.2, ease: 'power2.out' });
       vel = step * 9; // a quick turn in
     };
@@ -304,7 +371,13 @@ const data = work.map((w: any) => ({
       gsap.delayedCall(0.15, intro);
     }
 
+    // The stand-in card from the return morph: fade it out once it has landed
+    // on the real card underneath
+    const standIn = document.querySelector<HTMLElement>('img[data-returning]');
+    if (standIn) gsap.to(standIn, { opacity: 0, duration: 0.25, delay: 0.7, onComplete: () => standIn.remove() });
+
     return () => {
+      Object.assign(memory, { theta, visited: true });
       ac.abort();
       gsap.ticker.remove(frame);
       clearTimeout(hideTimer);
@@ -340,12 +413,12 @@ const data = work.map((w: any) => ({
   }
   .details.on { opacity: 1; visibility: visible; transition: opacity 0.35s; }
   .entry[hidden] { display: none; }
-  .sheet { margin: 0; display: grid; grid-template-columns: auto 1fr; }
-  .sheet .name {
-    grid-column: 1 / -1; margin: 0 0 0.5rem; padding-bottom: 0.4rem; text-align: left;
-    font-family: var(--font-display); font-size: var(--step-2); letter-spacing: -0.05em; line-height: 1;
+  .name {
+    margin: 0 0 0.5rem; padding-bottom: 0.4rem;
+    font-family: var(--font-display); font-size: var(--step-2); font-weight: 500; letter-spacing: -0.05em; line-height: 1;
     border-bottom: 1px solid var(--line);
   }
+  .sheet { margin: 0; display: grid; grid-template-columns: auto 1fr; }
   .sheet dt, .sheet dd { padding: 0.45rem 0; border-bottom: 1px solid var(--line); }
   .sheet dt { color: var(--mute); font-size: var(--step--2); padding-right: 1.5rem; align-self: stretch; display: flex; align-items: center; }
   .sheet dd { margin: 0; text-align: right; font-size: var(--step--1); }
@@ -371,6 +444,17 @@ const data = work.map((w: any) => ({
   .no-gl .fallback img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 6px; }
   .no-gl .fallback span { display: block; margin-top: 0.5rem; }
   .no-gl .stage { overflow-y: auto; }
+
+  /* Desktop: the details split across the bottom of the page grid, the title
+     (h2 size) in the bottom left and the facts in the last column on the right */
+  @media (min-width: 761px) and (hover: hover) and (pointer: fine) {
+    .details { left: var(--gutter); right: var(--gutter); width: auto; pointer-events: none; }
+    .entry { display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); align-items: end; }
+    .entry > * { padding-inline: var(--pad); }
+    .name { grid-column: 1 / span 2; margin: 0; padding-bottom: 0; border: 0; }
+    .info { grid-column: -2 / -1; pointer-events: auto; }
+    .info .sheet dt:first-child, .info .sheet dt:first-child + dd { border-top: 1px solid var(--line); }
+  }
 
   @media (max-width: 760px) {
     .details { --span: 2; }

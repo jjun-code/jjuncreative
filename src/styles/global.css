@@ -229,3 +229,11 @@ button:hover .roll > span, button:focus-visible .roll > span { transform: transl
   font-size: var(--step--1); scale: 0; transition: scale 0.35s var(--ease);
 }
 .cursor.is-view span { scale: 1; }
+
+/* ── Page transitions (Astro ClientRouter / view transitions) ──
+   A quick, plain swap of the page underneath (the default additive cross-fade
+   brightens the dark pages mid-way), while a clicked project card morphs into
+   its project's cover a little more slowly, as the main motion. */
+::view-transition-old(root), ::view-transition-new(root) { mix-blend-mode: normal; animation-duration: 0.22s; }
+::view-transition-group(project-cover) { animation-duration: 0.6s; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+::view-transition-old(project-cover), ::view-transition-new(project-cover) { animation-duration: 0.35s; }

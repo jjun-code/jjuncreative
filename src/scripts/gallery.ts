@@ -71,22 +71,37 @@ uniform sampler2D uScene;
 uniform vec2 uRes;
 uniform float uCA, uVel;
 out vec4 o;
-vec4 tap(vec2 uv, float blur) {
-  vec2 d = vec2(blur / uRes.x, 0.0);
-  return texture(uScene, uv) * 0.36
-    + (texture(uScene, uv + d) + texture(uScene, uv - d)) * 0.22
-    + (texture(uScene, uv + 2.0 * d) + texture(uScene, uv - 2.0 * d)) * 0.1;
-}
+const int N = 16;
 void main() {
   float dx = vUv.x - 0.5;
-  // 0 across the middle, rising toward the left and right edges
-  float e = smoothstep(0.24, 0.5, abs(dx));
+  // 0 across the middle, easing in toward the left and right edges
+  float e = smoothstep(0.22, 0.5, abs(dx));
   e *= e;
-  float k = e * uCA + uVel;
-  vec2 off = vec2(sign(dx) * k, 0.0);
-  float blur = e * 7.0 + uVel * 400.0;
-  vec4 r = tap(vUv - off, blur), g = tap(vUv, blur), b = tap(vUv + off, blur);
-  o = vec4(r.r, g.g, b.b, max(max(r.a, g.a), b.a));
+  // Turning fast adds to it, mostly at the sides so the middle stays readable
+  float v = uVel * (0.25 + 0.75 * e);
+  float k = e * uCA + v; // colour spread, in uv
+  float blurPx = e * 12.0 + v * 500.0; // soft blur radius, in px
+  // The middle stays sharp (and cheap)
+  if (k < 0.0002 && blurPx < 0.3) { o = texture(uScene, vUv); return; }
+  vec2 dir = vec2(sign(dx) * k, 0.0);
+  vec2 blur = vec2(blurPx / uRes.x, blurPx * 0.4 / uRes.y);
+  // Samples spread along the split, each tinted by where it falls on a
+  // red → green → blue spectrum, so the fringe is a smooth gradient rather than
+  // three hard copies; they also scatter over a small disc for the blur
+  vec3 rgb = vec3(0.0), alpha = vec3(0.0), wsum = vec3(0.0);
+  for (int i = 0; i < N; i++) {
+    float t = (float(i) + 0.5) / float(N);
+    vec3 w = max(vec3(0.0), 1.0 - abs(vec3(t) - vec3(0.15, 0.5, 0.85)) / vec3(0.45, 0.38, 0.45));
+    float ang = float(i) * 2.39996; // golden angle
+    vec2 disc = vec2(cos(ang), sin(ang)) * sqrt(t) * blur;
+    vec4 s = texture(uScene, vUv + dir * (t - 0.5) * 2.0 + disc);
+    rgb += s.rgb * w;
+    alpha += s.a * w;
+    wsum += w;
+  }
+  rgb /= wsum;
+  alpha /= wsum;
+  o = vec4(rgb, max(max(alpha.r, alpha.g), alpha.b)); // still premultiplied
 }`;
 
 function program(gl: WebGL2RenderingContext, vs: string, fs: string) {
