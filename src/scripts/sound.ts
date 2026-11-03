@@ -38,7 +38,7 @@ function unlock() {
 /* ── Background music ──
    A looping track that follows the same on/off switch. It fades in on the
    visitor's first click, tap or key press (browsers block sound before that),
-   pauses while the tab is hidden, and carries on across page changes (pages
+   keeps playing when the tab is in the background, and carries on across page changes (pages
    swap without a reload, and the player isn't part of the page). Its volume
    goes through a Web Audio gain, since iPhones ignore a media element's own
    volume. Ogg where the browser plays it (smaller), MP3 elsewhere (Safari). */
@@ -78,7 +78,7 @@ function fadeTo(target: number, seconds: number) {
 
 function playMusic() {
   const a = getMusic();
-  if (!a || !ctx || isMuted() || document.hidden) return;
+  if (!a || !ctx || isMuted()) return;
   connect(a);
   if (!a.paused) { fadeTo(MUSIC_VOLUME, 0.6); return; }
   // Rejected until the visitor has interacted; the gesture listeners retry
@@ -90,10 +90,9 @@ function pauseMusic() {
   if (!music || music.paused) return;
   fadeTo(0, 0.4);
   clearTimeout(pauseTimer);
-  pauseTimer = window.setTimeout(() => { if (isMuted() || document.hidden) music?.pause(); }, 500);
+  pauseTimer = window.setTimeout(() => { if (isMuted()) music?.pause(); }, 500);
 }
 
-document.addEventListener('visibilitychange', () => (document.hidden ? pauseMusic() : playMusic()));
 window.addEventListener('pagehide', () => {
   try { if (music) sessionStorage.setItem(POS_KEY, String(music.currentTime)); } catch {}
 });
