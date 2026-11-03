@@ -1,9 +1,9 @@
 import { config, fields, collection, singleton } from '@keystatic/core';
 
 // Local files while developing; Keystatic Cloud (saves to the GitHub repo) once live.
-// The Keystatic Cloud project (team/project); not a secret. PUBLIC_KEYSTATIC_PROJECT
-// can override it at build time.
-const project = import.meta.env.PUBLIC_KEYSTATIC_PROJECT || 'jjuncreative/jjuncreative';
+// The Keystatic Cloud project (team/project); not a secret, so it lives here
+// rather than in a build variable.
+const project = 'jjuncreative/jjuncreative';
 
 const imageWithFallback = (label: string, directory: string, publicPath: string) => ({
   image: fields.image({ label, directory, publicPath }),
