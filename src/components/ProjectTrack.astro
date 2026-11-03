@@ -3,8 +3,7 @@
 // cylinder, so it bends away at the sides, over the site's pixel background.
 // This is the whole home page. Cards are drawn with WebGL (scripts/gallery.ts),
 // which adds a lens-like colour fringe and smear toward the screen edges.
-// Scrolling, swiping or the arrow keys turn the row; a small label rides above
-// each card; hovering a card shows its details in the bottom left (on touch
+// Scrolling, swiping or the arrow keys turn the row; hovering a card shows its details in the bottom left (on touch
 // screens, the card at the front shows them). Projects repeat to fill the ring.
 import { src } from '../lib/content';
 const { work } = Astro.props;
@@ -37,7 +36,6 @@ const data = work.map((w: any) => ({
     </div>
 
     <canvas class="gl" aria-hidden="true"></canvas>
-    <div class="labels" aria-hidden="true"></div>
 
     <!-- The real links: read out by screen readers, reachable by tab, and shown
          as a plain grid if WebGL isn't available -->
@@ -62,11 +60,11 @@ const data = work.map((w: any) => ({
   type Geo = { view: View; slots: number; step: number; arc: number; radPerPx: number };
   const geometry = (W: number, H: number, n: number): Geo => {
     const phone = W < 760;
-    // The middle card is about 2.1× cw tall. On desktop that's 44% of the
-    // screen height (as on exp.fiddle.digital); on phones it must end above
-    // the details panel
-    const cw = phone ? Math.min(W * 0.46, H * 0.2) : Math.min(W * 0.15, H * 0.207);
-    const ch = cw * 1.42, gap = cw * 0.06; // ch: portrait height at the front
+    // The middle card is 3:4 and 2× cw tall (1.5× size × 4/3). On desktop that's
+    // 44% of the screen height (as on exp.fiddle.digital); on phones it must
+    // end above the details panel
+    const cw = phone ? Math.min(W * 0.46, H * 0.213) : Math.min(W * 0.16, H * 0.22);
+    const ch = cw * (4 / 3), gap = cw * 0.06; // ch: 3:4 portrait height at the front
     const R = phone ? W * 1.1 : W * 0.95;
     const slots = n * Math.max(1, Math.round((2 * Math.PI * R) / (cw + gap) / n));
     const step = (2 * Math.PI) / slots;
@@ -152,7 +150,6 @@ const data = work.map((w: any) => ({
     const data: Project[] = JSON.parse(sec.dataset.projects!);
     const n = data.length;
     const canvas = sec.querySelector<HTMLCanvasElement>('canvas.gl')!;
-    const labelsBox = sec.querySelector<HTMLElement>('.labels')!;
     const details = sec.querySelector<HTMLElement>('.details')!;
     const entries = [...sec.querySelectorAll<HTMLElement>('.entry')];
     const links = [...sec.querySelectorAll<HTMLAnchorElement>('.fallback a')];
@@ -170,18 +167,9 @@ const data = work.map((w: any) => ({
 
     // ── Layout: card size from the viewport, ring sized to fit whole projects ──
     let g: Geo, view: View, slots = 0, step = 0, radPerPx = 0;
-    let labels: HTMLElement[] = [];
     const layout = () => {
       g = geometry(window.innerWidth, window.innerHeight, n);
       ({ view, slots, step, radPerPx } = g);
-      labelsBox.textContent = '';
-      labels = Array.from({ length: slots }, (_, s) => {
-        const el = document.createElement('span');
-        el.className = 'tag mono';
-        el.textContent = data[s % n].title;
-        labelsBox.append(el);
-        return el;
-      });
       gallery.resize();
     };
     layout();
@@ -289,7 +277,7 @@ const data = work.map((w: any) => ({
       coverStandIn(g, s, theta, data[s % n].img);
       Object.assign(memory, { slot: s, slug: data[s % n].slug, theta });
       // Quiet the rest of the page as it goes
-      gsap.to([labelsBox, details], { opacity: 0, duration: 0.2 });
+      gsap.to(details, { opacity: 0, duration: 0.2 });
       vel = 0; hovered = -1;
       hum();
       navigate(`/work/${data[s % n].slug}/`);
@@ -326,17 +314,8 @@ const data = work.map((w: any) => ({
       for (let s = 0; s < slots; s++) {
         const a0 = rel(s);
         if (Math.abs(a0) < best) { best = Math.abs(a0); nearest = s; }
-        const c = shape(a0), aa = Math.abs(c.angle);
-        const el = labels[s];
-        if (aa > 1.4) { el.style.opacity = '0'; continue; }
-        cards.push({ tex: s % n, ...c });
-        // Label just above the card's top-left corner, no wider than the card,
-        // fading toward the edges
-        const [x, y] = project(view, c.angle, c.arc, 0, 0, c.ch);
-        const [x2] = project(view, c.angle, c.arc, 1, 0, c.ch);
-        el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0) translateY(calc(-100% - 6px))`;
-        el.style.maxWidth = `${Math.max(0, x2 - x - 4).toFixed(0)}px`;
-        el.style.opacity = String(Math.max(0, Math.min(1, (1.0 - aa) / 0.35)));
+        const c = shape(a0);
+        if (Math.abs(c.angle) < 1.4) cards.push({ tex: s % n, ...c });
       }
       // Back to front, so nearer cards draw over farther ones
       cards.sort((a, b) => Math.cos(a.angle) - Math.cos(b.angle));
@@ -362,7 +341,7 @@ const data = work.map((w: any) => ({
     // Entrance plays as the loader dissolves, or straight away on later pages
     const intro = () => {
       if (rm || returning) return;
-      gsap.fromTo([canvas, labelsBox], { opacity: 0 }, { opacity: 1, duration: 1.2, ease: 'power2.out' });
+      gsap.fromTo(canvas, { opacity: 0 }, { opacity: 1, duration: 1.2, ease: 'power2.out' });
       vel = step * 9; // a quick turn in
     };
     if (document.documentElement.classList.contains('is-loading')) {
@@ -394,13 +373,6 @@ const data = work.map((w: any) => ({
   :global(html:has(.projects)) { overflow: hidden; }
 
   .gl { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; display: block; }
-  .labels { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-  /* Small project label riding above each card */
-  .labels :global(.tag) {
-    position: absolute; left: 0; top: 0; color: var(--mute); line-height: 1;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    will-change: transform, opacity; opacity: 0;
-  }
 
   /* Project details, bottom left: hidden until a card is hovered */
   /* Exactly one grid column wide (two on phones), inset from its lines like page content */
@@ -435,7 +407,7 @@ const data = work.map((w: any) => ({
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
     list-style: none; margin: 0; padding: 0;
   }
-  .no-gl .gl, .no-gl .labels { display: none; }
+  .no-gl .gl { display: none; }
   .no-gl .fallback {
     position: static; width: auto; height: auto; overflow: visible; clip-path: none;
     display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: 1rem;
