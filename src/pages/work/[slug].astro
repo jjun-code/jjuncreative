@@ -20,9 +20,20 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
   <article class="case">
     <header class="grid top">
       <div class="crumbs c-full">
-        <a href="/work" class="tag">← All work</a>
+        <!-- Back to wherever the visitor came from (keeping their place on the
+             home page); straight to home if they landed here directly -->
+        <a href="/" class="tag" data-back>← Back</a>
         <span class="num">{String(i + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
       </div>
+    </header>
+
+    <!-- The cover leads the page; the card clicked on the home page morphs
+         into it (and back into the card on the way back), via project-cover -->
+    {cover && (
+      <figure class="cover grid"><div class="frame c-full" transition:name="project-cover"><img src={cover} alt={`${w.title} cover`} /></div></figure>
+    )}
+
+    <header class="grid head">
       <h1 class="h1 title c-full">{w.title}</h1>
       <p class="summary h3 c-1">{w.summary}</p>
       <dl class="facts c-3 sub">
@@ -31,10 +42,6 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
         <div><dt class="label">Tools</dt><dd>{w.tools.join(', ')}</dd></div>
       </dl>
     </header>
-
-    {cover && (
-      <figure class="cover grid"><div class="frame c-full"><img src={cover} alt={`${w.title} cover`} /></div></figure>
-    )}
 
     {(w.problem || w.solution) && (
       <section class="ps grid">
@@ -77,13 +84,12 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
   import { gsap, reduced } from '../../scripts/smooth';
   import { onPage } from '../../scripts/page';
   onPage(() => {
+    document.querySelector('[data-back]')?.addEventListener('click', (e) => {
+      if ((history.state?.index ?? 0) > 0) { e.preventDefault(); history.back(); }
+    });
     if (!reduced()) {
       gsap.from('.title', { yPercent: 40, opacity: 0, duration: 1.1, ease: 'expo.out' });
       gsap.from('.facts > div', { y: 20, opacity: 0, duration: 0.9, ease: 'expo.out', stagger: 0.07, delay: 0.2 });
-      gsap.fromTo('.cover .frame', { clipPath: 'inset(10% 6% 10% 6% round 8px)' }, {
-        clipPath: 'inset(0% 0% 0% 0% round 8px)', ease: 'none',
-        scrollTrigger: { trigger: '.cover', start: 'top 85%', end: 'top 15%', scrub: true },
-      });
       gsap.utils.toArray<HTMLElement>('.feature img').forEach((img) => {
         gsap.fromTo(img, { yPercent: -6 }, { yPercent: 6, ease: 'none', scrollTrigger: { trigger: img.parentElement, scrub: true } });
       });
@@ -93,7 +99,8 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
 
 <style>
   .case { position: relative; }
-  .top { padding-top: clamp(7rem, 13vw, 10rem); row-gap: 0; }
+  .top { padding-top: calc(5.5rem + 1.25rem); row-gap: 0; }
+  .head { row-gap: 0; }
   .crumbs { display: flex; align-items: center; justify-content: space-between; }
   .crumbs .tag:hover { color: var(--ink); border-color: var(--line-strong); }
   .title { font-size: var(--step-5); margin: 2rem 0 2.5rem; overflow-wrap: anywhere; }
@@ -106,8 +113,10 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
 
   .frame { overflow: hidden; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); padding: 0; }
   .frame img { width: 100%; }
-  .cover { margin: clamp(3rem, 6vw, 5rem) 0 0; }
-  .cover .frame { min-height: 30vh; }
+  /* Up top, sized to leave a hint of the title below it on first view */
+  .cover { margin: 1.25rem 0 0; }
+  .cover .frame { height: min(72svh, 56vw); min-height: 16rem; }
+  .cover .frame img { height: 100%; object-fit: cover; }
 
   .ps { padding-block: clamp(3rem, 7vw, 6rem); row-gap: 2rem; }
   .ps > div { border-top: 1px solid var(--line); padding-top: 0.9rem; }
