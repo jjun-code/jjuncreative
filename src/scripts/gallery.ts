@@ -212,10 +212,49 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   gl.bindVertexArray(null);
   const empty = gl.createVertexArray()!;
 
-  // Card images, loaded in the background; cards show their tint until then
-  type Tex = { tex: WebGLTexture; tint: number[]; aspect: number; loaded: number };
+  // Card images, loaded in the background; cards show their tint until then.
+  // Animated GIFs play: their frames are decoded one at a time (ImageDecoder,
+  // where the browser has it; elsewhere they show their first frame) and
+  // swapped into the texture on each frame's own timing
+  type Gif = { dec: any; count: number; i: number; next: number; busy: boolean };
+  type Tex = { tex: WebGLTexture; tint: number[]; aspect: number; loaded: number; gif?: Gif; dead?: boolean };
+  const Decoder = (window as any).ImageDecoder;
+  const playGif = async (t: Tex, src: string) => {
+    try {
+      const res = await fetch(src);
+      const dec = new Decoder({ data: res.body, type: 'image/gif' });
+      await dec.completed; // the frame count is only known once it's all read
+      const count = dec.tracks.selectedTrack?.frameCount ?? 1;
+      if (count > 1 && !t.dead) t.gif = { dec, count, i: 1, next: 0, busy: false };
+      else dec.close();
+    } catch {}
+  };
+  const upload = (t: Tex, source: TexImageSource) => {
+    gl.bindTexture(gl.TEXTURE_2D, t.tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.generateMipmap(gl.TEXTURE_2D);
+  };
+  const stepGifs = () => {
+    const now = performance.now();
+    for (const t of tex) {
+      const g = t.gif;
+      if (!g || g.busy || now < g.next) continue;
+      g.busy = true;
+      g.dec.decode({ frameIndex: g.i }).then(({ image }: { image: VideoFrame }) => {
+        if (!t.dead) {
+          upload(t, image);
+          // duration is in microseconds; very short delays play at ~10 fps, as browsers do
+          const ms = (image.duration ?? 0) / 1000;
+          g.next = performance.now() + (ms >= 20 ? ms : 100);
+          g.i = (g.i + 1) % g.count;
+        }
+        image.close();
+        g.busy = false;
+      }).catch(() => { t.gif = undefined; });
+    }
+  };
   const load = (s: { src: string; tint: string }): Tex => {
-    const t = { tex: gl.createTexture()!, tint: hex(s.tint), aspect: 1, loaded: 0 };
+    const t: Tex = { tex: gl.createTexture()!, tint: hex(s.tint), aspect: 1, loaded: 0 };
     const img = new Image();
     img.decoding = 'async';
     img.onload = () => {
@@ -227,6 +266,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       t.aspect = img.naturalWidth / img.naturalHeight;
       t.loaded = 1;
+      if (Decoder && /\.gif(\?|$)/i.test(s.src)) playGif(t, s.src);
     };
     if (s.src) img.src = s.src;
     return t;
@@ -234,7 +274,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   let tex = sources.map(load);
   /** Swap in a different set of card images (the home page's tabs). */
   const setSources = (next: { src: string; tint: string }[]) => {
-    tex.forEach((t) => gl.deleteTexture(t.tex));
+    tex.forEach((t) => { t.dead = true; t.gif?.dec.close(); gl.deleteTexture(t.tex); });
     tex = next.map(load);
   };
 
@@ -263,6 +303,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   /** Cards must come back to front. vel: scroll speed, adds to the effect.
       radial: the photo field's fisheye instead of the row's side lens. */
   const draw = (v: View, cards: CardDraw[], vel: number, radial = false) => {
+    stepGifs();
     gl.viewport(0, 0, w, h);
     gl.bindFramebuffer(gl.FRAMEBUFFER, targets[0].fbo);
     gl.clearColor(0, 0, 0, 0);
@@ -328,6 +369,9 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   /** A card image's width/height, once loaded (null before). */
   const aspectOf = (i: number) => (tex[i]?.loaded ? tex[i].aspect : null);
 
-  const destroy = () => gl.getExtension('WEBGL_lose_context')?.loseContext();
+  const destroy = () => {
+    tex.forEach((t) => { t.dead = true; t.gif?.dec.close(); });
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+  };
   return { draw, resize, setSources, aspectOf, destroy };
 }
