@@ -1,13 +1,10 @@
 title: BMW 1M
+hidden: true
 kind: photo
 image: /images/journal/bmw-1m/image.webp
 more:
   - image: /images/journal/bmw-1m/more/0/image.webp
-    caption: ''
   - image: /images/journal/bmw-1m/more/1/image.webp
-    caption: ''
   - image: /images/journal/bmw-1m/more/2/image.webp
-    caption: ''
   - image: /images/journal/bmw-1m/more/3/image.webp
-    caption: ''
 color: '#2a2a2a'
