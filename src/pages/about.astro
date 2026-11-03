@@ -1,6 +1,6 @@
 ---
 import Base from '../layouts/Base.astro';
-import { siFigma, siFramer, siNotion, siClaude, siSteam } from 'simple-icons';
+import { siFigma, siFramer, siNotion, siClaude, siSteam, siGithub, siCloudflare } from 'simple-icons';
 import { reader, src } from '../lib/content';
 const a = (await reader.singletons.about.read())!;
 const portrait = src(a.portrait, 1200);
@@ -10,10 +10,11 @@ const portrait = src(a.portrait, 1200);
 const siAdobe = { path: 'M13.966 22.624l-1.69-4.281H8.122l3.892-9.144 5.662 13.425zM8.884 1.376H0v21.248zm15.116 0h-8.884L24 22.624Z', hex: 'FA0F00' };
 const logos: Record<string, { path: string; hex: string }> = {
   figma: siFigma, framer: siFramer, notion: siNotion, claude: siClaude, steam: siSteam, adobe: siAdobe,
+  github: siGithub, cloudflare: siCloudflare,
 };
 const logoFor = (name: string) => logos[name.toLowerCase().split(/\s+/)[0]];
 // Black brand colours would vanish on the dark theme, so they use the text colour
-const brand = (hex: string) => (hex === '000000' || hex === '191919' ? 'var(--ink)' : `#${hex}`);
+const brand = (hex: string) => (['000000', '191919', '181717'].includes(hex) ? 'var(--ink)' : `#${hex}`);
 // Each card floods with its brand colour on hover; the logo then switches to
 // whichever of white or near-black reads on that colour
 const colours = (name: string) => {

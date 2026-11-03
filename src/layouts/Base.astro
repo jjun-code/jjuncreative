@@ -4,6 +4,7 @@ import { ClientRouter } from 'astro:transitions';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import Loader from '../components/Loader.astro';
+import Compose from '../components/Compose.astro';
 import { getSite } from '../lib/content';
 
 interface Props { title?: string; description?: string; image?: string; footer?: boolean; footerCta?: boolean }
@@ -57,6 +58,7 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
       <slot />
     </main>
     {footer && <Footer site={site} cta={footerCta} />}
+    <Compose email={site.email} />
     <canvas class="trail" aria-hidden="true" transition:persist="trail"></canvas>
     <div class="cursor" aria-hidden="true" transition:persist="cursor"><span>view</span></div>
     <script>

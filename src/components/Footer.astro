@@ -18,7 +18,7 @@ const [user] = site.email.split('@');
   </button>
 
   <dl class="cells c-full sub" data-reveal>
-    <div><dt class="mono">Write</dt><dd><a href={`mailto:${site.email}`} class="sweep">Send an email ↗</a></dd></div>
+    <div><dt class="mono">Write</dt><dd><a href={`mailto:${site.email}`} class="sweep" data-compose>Send an email ↗</a></dd></div>
     {site.socials.map((s: any) => (
       <div><dt class="mono">Elsewhere</dt><dd><a href={s.url} target="_blank" rel="noopener" class="sweep">{s.label} ↗</a></dd></div>
     ))}

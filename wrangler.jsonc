@@ -1,0 +1,11 @@
+// Merged into the Worker config the Cloudflare adapter generates at build time.
+// send_email lets the site's contact form (src/pages/api/contact.ts) email the
+// site owner. Cloudflare only delivers to addresses verified in Email Routing,
+// and the sender must be on a domain with Email Routing on (jjuncreative.com).
+{
+  "name": "jjuncreative",
+  "compatibility_date": "2026-10-23",
+  "send_email": [
+    { "name": "MAILER", "destination_address": "jjuncreative@gmail.com" }
+  ]
+}
