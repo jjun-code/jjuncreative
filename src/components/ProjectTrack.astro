@@ -3,46 +3,118 @@
 // cylinder, so it bends away at the sides, over the site's pixel background.
 // This is the whole home page. Cards are drawn with WebGL (scripts/gallery.ts),
 // which adds a lens-like colour fringe and smear toward the screen edges.
-// Scrolling, swiping or the arrow keys turn the row; hovering a card shows its details in the bottom left (on touch
-// screens, the card at the front shows them). Projects repeat to fill the ring.
+// Scrolling, swiping or the arrow keys turn the row; hovering a card shows its
+// details (on touch screens, the card at the front shows them). Items repeat
+// to fill the ring. A toggle at the bottom switches between Design (the work), Photography
+// and Experiments; an empty tab says "Coming soon". Photography is laid out
+// differently: an endless field of photos to drag around (scripts/photoGrid.ts),
+// and clicking one opens it full screen.
 import { src } from '../lib/content';
-const { work } = Astro.props;
-const data = work.map((w: any) => ({
-  slug: w.slug,
-  title: w.title,
-  img: src(w.cover, 1200) || src(w.inlineImage, 1200) || src(w.gallery[0], 1200) || '',
-  tint: w.charm.color,
-}));
+const { work, photography, experiments } = Astro.props;
+const img = (i: any) => (typeof i === 'string' ? i : src(i, 1200)) || '';
+const sets = [
+  {
+    key: 'work', label: 'Design',
+    items: work.map((w: any) => ({
+      title: w.title, img: img(w.cover) || img(w.inlineImage) || img(w.gallery[0]), tint: w.charm.color,
+      href: `/work/${w.slug}/`, slug: w.slug, facts: [['Category', w.category], ['Year', w.year]], tools: w.tools,
+      summary: w.summary, cta: 'View project',
+    })),
+  },
+  {
+    key: 'photography', label: 'Photography',
+    items: photography.map((p: any) => ({
+      title: p.title, img: img(p.image), tint: p.color || '#2a2a2a', href: p.link || '', slug: p.slug,
+      facts: [['Location', p.location], ['Year', p.year]], tools: [], summary: p.description, cta: 'Open',
+      meta: [p.location, p.year].filter(Boolean).join(' · '),
+    })),
+  },
+  {
+    key: 'experiments', label: 'Experiments',
+    items: experiments.map((x: any) => ({
+      title: x.title, img: img(x.image), tint: x.color || '#2a2a2a', href: x.link || '', slug: x.slug,
+      facts: [['Type', x.category], ['Year', x.year]], tools: x.tools ?? [], summary: x.description, cta: 'Open',
+    })),
+  },
+];
+// Tab icons, 20×20 line drawings: pen nib, camera, flask
+const icons: Record<string, string> = {
+  work: '<path d="M10 3 15.5 9 12 17H8L4.5 9Z"/><path d="M10 3v6.5"/><circle cx="10" cy="11" r="1.3"/><path d="M8 17h4"/>',
+  photography: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h2l1.3-2h4.4l1.3 2h2A1.5 1.5 0 0 1 17 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5Z"/><circle cx="10" cy="10.5" r="3"/>',
+  experiments: '<path d="M8 3h4M8.5 3v4.5L4 15a1.3 1.3 0 0 0 1.1 2h9.8A1.3 1.3 0 0 0 16 15l-4.5-7.5V3M6 12.5h8"/>',
+};
+// Tabs with nothing in them yet are left out (Design always shows)
+const tabs = sets.filter((s) => s.key === 'work' || s.items.length);
+// The client only needs what it draws and links to
+const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, img, tint, href, slug, meta }: any) => ({ title, img, tint, href, slug, meta })) }));
 ---
-<section class="projects" id="work" aria-label="Projects" data-projects={JSON.stringify(data)}>
+<section class="projects" id="work" aria-label="Work, photography and experiments" data-sets={JSON.stringify(clientSets)}>
   <div class="stage">
     <div class="details" aria-live="polite">
-      {work.map((w: any, i: number) => (
-        <div class="entry" data-i={i} hidden>
-          <h2 class="name">{w.title}</h2>
+      {sets.map((set) => set.items.map((it: any, i: number) => (
+        <div class="entry" data-set={set.key} data-i={i} hidden>
+          <h2 class="name">{it.title}</h2>
           <div class="info">
             <dl class="sheet">
-              <dt class="mono">Category</dt><dd>{w.category}</dd>
-              <dt class="mono">Year</dt><dd>{w.year}</dd>
-              {w.tools.length > 0 && <><dt class="mono">Tools</dt><dd class="tools">{w.tools.map((t: string) => <span>{t}</span>)}</dd></>}
+              {it.facts.filter(([, v]: any) => v).map(([k, v]: any) => <><dt class="mono">{k}</dt><dd>{v}</dd></>)}
+              {it.tools.length > 0 && <><dt class="mono">Tools</dt><dd class="tools">{it.tools.map((t: string) => <span>{t}</span>)}</dd></>}
             </dl>
             <div class="caption">
-              <p class="mono">{w.summary}</p>
-              <a href={`/work/${w.slug}/`} class="mono view">View project <span aria-hidden="true">→</span></a>
+              {it.summary && <p class="mono">{it.summary}</p>}
+              {it.href && (it.href.startsWith('/')
+                ? <a href={it.href} class="mono view">{it.cta} <span aria-hidden="true">→</span></a>
+                : <a href={it.href} class="mono view" target="_blank" rel="noopener">{it.cta} <span aria-hidden="true">↗</span></a>)}
             </div>
           </div>
         </div>
-      ))}
+      )))}
     </div>
 
     <canvas class="gl" aria-hidden="true"></canvas>
+    <!-- Photo titles in the photography field, placed by script -->
+    <div class="field-labels mono" aria-hidden="true" hidden></div>
+    <p class="empty mono" hidden>Coming soon</p>
+
+    <!-- A photo, full screen -->
+    <dialog class="lightbox" aria-label="Photo" tabindex="-1">
+      <img alt="" />
+      <div class="lb-bar">
+        <p class="lb-title"></p>
+        <p class="lb-meta mono"></p>
+        <p class="lb-count mono"></p>
+      </div>
+      <!-- Round glass buttons like the nav's; Close opens its label on hover -->
+      <button type="button" class="lb-btn lb-close" aria-label="Close">
+        <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="m5.5 5.5 9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" /></svg></span>
+        <span class="lbl" aria-hidden="true"><span><span>Close</span></span></span>
+      </button>
+      <button type="button" class="lb-btn lb-prev" aria-label="Previous photo">
+        <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16 10H4.5M9 5l-5 5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" /></svg></span>
+      </button>
+      <button type="button" class="lb-btn lb-next" aria-label="Next photo">
+        <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 10h11.5M11 5l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" /></svg></span>
+      </button>
+    </dialog>
+
+    <!-- Design / Photography / Experiments: icons, with the label open on the
+         active tab (and on hover); the lime pill slides to the active one -->
+    <!-- Hidden while Design is the only tab with anything in it -->
+    <nav class="switch" aria-label="Show" hidden={tabs.length < 2}>
+      <span class="switch-hl" aria-hidden="true"></span>
+      {tabs.map((set) => (
+        <button type="button" data-set={set.key} aria-pressed={set.key === 'work' ? 'true' : 'false'}>
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={icons[set.key]} />
+          <span class="lbl"><span><span>{set.label}</span></span></span>
+        </button>
+      ))}
+    </nav>
 
     <!-- The real links: read out by screen readers, reachable by tab, and shown
          as a plain grid if WebGL isn't available -->
     <ul class="fallback">
-      {work.map((w: any, i: number) => (
-        <li><a href={`/work/${w.slug}/`} data-i={i}><img src={data[i].img} alt="" loading="lazy" /><span class="mono">{w.title}</span></a></li>
-      ))}
+      {sets.map((set) => set.items.filter((it: any) => it.href).map((it: any) => (
+        <li><a href={it.href} data-set={set.key} data-i={set.items.indexOf(it)}><img src={it.img} alt="" loading="lazy" /><span class="mono">{it.title}</span></a></li>
+      )))}
     </ul>
   </div>
 </section>
@@ -52,9 +124,11 @@ const data = work.map((w: any) => ({
   import { tick, hum } from '../scripts/sound';
   import { onPage } from '../scripts/page';
   import { createGallery, project, type View, type CardDraw } from '../scripts/gallery';
+  import { createPhotoField } from '../scripts/photoGrid';
   import { navigate } from 'astro:transitions/client';
 
-  type Project = { slug: string; title: string; img: string; tint: string };
+  type Item = { title: string; img: string; tint: string; href: string; slug: string; meta?: string };
+  type Set = { key: string; items: Item[] };
 
   // ── Geometry (pure, so it can also place a card before the page starts) ──
   type Geo = { view: View; slots: number; step: number; arc: number; radPerPx: number };
@@ -127,7 +201,7 @@ const data = work.map((w: any) => ({
   // Kept across page changes: where the row was, and which card was opened,
   // so coming back lands in the same place and the cover can shrink back into
   // its card
-  const memory = { theta: 0, visited: false, slot: -1, slug: '' };
+  const memory = { theta: 0, visited: false, slot: -1, slug: '', set: 'work' };
   // Forget the opened card unless this is the trip straight back home from its
   // project (the trip out, from home, keeps it)
   document.addEventListener('astro:before-preparation', (e) => {
@@ -138,7 +212,9 @@ const data = work.map((w: any) => ({
   document.addEventListener('astro:after-swap', () => {
     const sec = document.querySelector<HTMLElement>('.projects');
     if (memory.slot < 0 || !sec) return;
-    const data: Project[] = JSON.parse(sec.dataset.projects!);
+    const sets: Set[] = JSON.parse(sec.dataset.sets!);
+    const data = sets.find((x) => x.key === memory.set)?.items ?? [];
+    if (!data.length) return;
     const g = geometry(window.innerWidth, window.innerHeight, data.length);
     coverStandIn(g, memory.slot, memory.theta, data[memory.slot % data.length].img).dataset.returning = '';
     memory.slot = -1;
@@ -147,20 +223,78 @@ const data = work.map((w: any) => ({
   onPage(() => {
     const sec = document.querySelector<HTMLElement>('.projects');
     if (!sec) return;
-    const data: Project[] = JSON.parse(sec.dataset.projects!);
-    const n = data.length;
+    const sets: Set[] = JSON.parse(sec.dataset.sets!);
+    let current = sets.some((x) => x.key === memory.set) ? memory.set : 'work';
+    const itemsOf = (key: string) => sets.find((x) => x.key === key)?.items ?? [];
+    let data = itemsOf(current);
+    let n = data.length;
     const canvas = sec.querySelector<HTMLCanvasElement>('canvas.gl')!;
     const details = sec.querySelector<HTMLElement>('.details')!;
-    const entries = [...sec.querySelectorAll<HTMLElement>('.entry')];
+    const empty = sec.querySelector<HTMLElement>('.empty')!;
+    const entriesOf = (key: string) => [...sec.querySelectorAll<HTMLElement>(`.entry[data-set="${key}"]`)];
+    let entries = entriesOf(current);
     const links = [...sec.querySelectorAll<HTMLAnchorElement>('.fallback a')];
 
-    const gallery = n > 0 ? createGallery(canvas, data.map((d) => ({ src: d.img, tint: d.tint }))) : null;
+    const gallery = createGallery(canvas, data.map((d) => ({ src: d.img, tint: d.tint })));
     if (!gallery) { sec.classList.add('no-gl'); return; }
 
     // Listeners outside the section are removed when the page changes
     const ac = new AbortController();
     const { signal } = ac;
     const rm = reduced();
+
+    // ── Photography: the photo field, and a photo full screen ──
+    const box = sec.querySelector<HTMLDialogElement>('.lightbox')!;
+    const boxImg = box.querySelector('img')!;
+    let boxAt = 0;
+    const showPhoto = (i: number, dir = 0) => {
+      boxAt = (i + n) % n;
+      const it = data[boxAt];
+      boxImg.src = it.img;
+      boxImg.alt = it.title;
+      box.querySelector('.lb-title')!.textContent = it.title;
+      box.querySelector('.lb-meta')!.textContent = it.meta ?? '';
+      box.querySelector('.lb-count')!.textContent = `${String(boxAt + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`;
+      if (!rm) gsap.fromTo(boxImg, { opacity: 0, x: dir * 40, scale: dir ? 1 : 0.96 }, { opacity: 1, x: 0, scale: 1, duration: 0.6, ease: 'expo.out' });
+    };
+    const openPhoto = (i: number) => {
+      hum();
+      showPhoto(i);
+      box.showModal();
+      box.focus();
+      if (!rm) gsap.fromTo(box, { opacity: 0 }, { opacity: 1, duration: 0.3 });
+    };
+    const closePhoto = () => {
+      if (!box.open) return;
+      if (rm) { box.close(); return; }
+      gsap.to(box, { opacity: 0, duration: 0.2, onComplete: () => box.close() });
+    };
+    box.querySelector('.lb-close')!.addEventListener('click', closePhoto);
+    box.querySelector('.lb-prev')!.addEventListener('click', () => showPhoto(boxAt - 1, -1));
+    box.querySelector('.lb-next')!.addEventListener('click', () => showPhoto(boxAt + 1, 1));
+    // Clicking the dark space around the photo closes it; Esc does too
+    box.addEventListener('click', (e) => { if (e.target === box) closePhoto(); });
+    box.addEventListener('cancel', (e) => { e.preventDefault(); closePhoto(); });
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') showPhoto(boxAt - 1, -1);
+      if (e.key === 'ArrowRight') showPhoto(boxAt + 1, 1);
+    });
+
+    const field = createPhotoField({
+      canvas, gallery,
+      labels: sec.querySelector<HTMLElement>('.field-labels')!,
+      onHover: (i) => {
+        if (mobile.matches) return;
+        if (i >= 0) show(i); else hide();
+      },
+      onOpen: openPhoto,
+    });
+    // Switch between the row and the field for a tab
+    const useLayout = (key: string) => {
+      field.setItems(data);
+      if (key === 'photography' && n) field.activate(); else field.deactivate();
+      sec.classList.toggle('is-field', field.active);
+    };
     // Phones (touch screens or narrow windows) always show the details for the
     // card at the front; elsewhere they appear on hover
     const mobile = window.matchMedia('(hover: none), (max-width: 760px)');
@@ -168,11 +302,16 @@ const data = work.map((w: any) => ({
     // ── Layout: card size from the viewport, ring sized to fit whole projects ──
     let g: Geo, view: View, slots = 0, step = 0, radPerPx = 0;
     const layout = () => {
-      g = geometry(window.innerWidth, window.innerHeight, n);
-      ({ view, slots, step, radPerPx } = g);
+      // An empty tab keeps the geometry of one card but has nothing to place
+      g = geometry(window.innerWidth, window.innerHeight, Math.max(1, n));
+      ({ view, step, radPerPx } = g);
+      slots = n ? g.slots : 0;
+      empty.hidden = n > 0;
       gallery.resize();
+      field.resize();
     };
     layout();
+    useLayout(current);
 
     // ── Details: shown while a card (or the panel itself) is hovered ──
     let shown = -1, hideTimer = 0, front = -1;
@@ -186,13 +325,13 @@ const data = work.map((w: any) => ({
     };
     const hide = () => {
       clearTimeout(hideTimer);
-      if (mobile.matches) { if (front >= 0) show(front % n); return; }
+      if (mobile.matches && !field.active) { if (front >= 0 && n) show(front % n); return; }
       hideTimer = window.setTimeout(() => { details.classList.remove('on'); shown = -1; }, 350);
     };
     details.addEventListener('pointerenter', () => clearTimeout(hideTimer));
     details.addEventListener('pointerleave', hide);
     links.forEach((a) => {
-      a.addEventListener('focus', () => show(Number(a.dataset.i)));
+      a.addEventListener('focus', () => { if (a.dataset.set === current) show(Number(a.dataset.i)); });
       a.addEventListener('blur', hide);
     });
 
@@ -207,6 +346,7 @@ const data = work.map((w: any) => ({
 
     sec.addEventListener('wheel', (e) => {
       e.preventDefault();
+      if (field.active) return;
       const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
       const px = e.deltaMode === 1 ? d * 40 : d;
       vel = Math.max(-step * 18, Math.min(step * 18, vel - px * 0.01 * step));
@@ -215,10 +355,12 @@ const data = work.map((w: any) => ({
 
     let lastX = 0, lastY = 0, lastT = 0, vx = 0, moved = 0;
     sec.addEventListener('touchstart', (e) => {
+      if (field.active) return;
       lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; lastT = performance.now();
       dragging = true; vel = 0; vx = 0; moved = 0;
     }, { passive: true });
     sec.addEventListener('touchmove', (e) => {
+      if (field.active) return;
       const t = e.touches[0], now = performance.now();
       const dx = t.clientX - lastX, dy = t.clientY - lastY;
       // Sideways swipes follow the finger; vertical ones turn it too
@@ -230,6 +372,7 @@ const data = work.map((w: any) => ({
       spun();
     }, { passive: true });
     sec.addEventListener('touchend', (e) => {
+      if (field.active) return;
       dragging = false;
       vel = Math.max(-step * 18, Math.min(step * 18, vx));
       // A tap (no drag) on a card opens it
@@ -242,7 +385,7 @@ const data = work.map((w: any) => ({
 
     window.addEventListener('keydown', (e) => {
       const el = e.target instanceof Element ? e.target : null;
-      if (el?.closest('input, textarea, [contenteditable]')) return;
+      if (field.active || el?.closest('input, textarea, [contenteditable]')) return;
       // vel decays at 3/s, so 3 × step coasts exactly one card
       if (['ArrowDown', 'ArrowRight', 'PageDown'].includes(e.key)) { e.preventDefault(); vel -= step * 3; spun(); }
       if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); vel += step * 3; spun(); }
@@ -273,14 +416,18 @@ const data = work.map((w: any) => ({
       return -1;
     };
     // ── Opening a project: the card morphs into the project's cover ──
+    // (Photography and Experiments items open their link, if they have one)
     const open = (s: number) => {
-      coverStandIn(g, s, theta, data[s % n].img);
-      Object.assign(memory, { slot: s, slug: data[s % n].slug, theta });
+      const it = data[s % n];
+      if (!it.href) return;
+      hum();
+      if (!it.href.startsWith('/')) { window.open(it.href, '_blank', 'noopener'); return; }
+      coverStandIn(g, s, theta, it.img);
+      Object.assign(memory, { slot: s, slug: it.slug, theta, set: current });
       // Quiet the rest of the page as it goes
       gsap.to(details, { opacity: 0, duration: 0.2 });
       vel = 0; hovered = -1;
-      hum();
-      navigate(`/work/${data[s % n].slug}/`);
+      navigate(it.href);
     };
 
     let mx = 0, my = 0, mouseIn = false, hovered = -1;
@@ -288,7 +435,7 @@ const data = work.map((w: any) => ({
       if (s === hovered) return;
       hovered = s;
       canvas.style.cursor = s >= 0 ? 'pointer' : '';
-      window.dispatchEvent(new CustomEvent('cursor:label', { detail: s >= 0 ? 'view' : null }));
+      window.dispatchEvent(new CustomEvent('cursor:label', { detail: s >= 0 && data[s % n].href ? 'view' : null }));
       if (s >= 0) show(s % n); else hide();
     };
     canvas.addEventListener('pointermove', (e) => {
@@ -296,11 +443,12 @@ const data = work.map((w: any) => ({
       mx = e.clientX; my = e.clientY; mouseIn = true;
     });
     canvas.addEventListener('pointerleave', () => { mouseIn = false; setHover(-1); });
-    canvas.addEventListener('click', () => { if (hovered >= 0) open(hovered); });
+    canvas.addEventListener('click', () => { if (hovered >= 0 && !field.active) open(hovered); });
 
     // ── Frame ──
     const frame = (_t: number, dtMs: number) => {
       const dt = Math.min(dtMs, 50) / 1000;
+      if (field.active) { field.frame(dt, view); return; }
       // A slow drift that eases off while a card is hovered, so it holds still to read
       drift += ((hovered >= 0 || rm || performance.now() < holdUntil ? 0 : 1) - drift) * Math.min(1, dt * 4);
       if (!dragging) {
@@ -322,7 +470,7 @@ const data = work.map((w: any) => ({
       // Turning fast strengthens the fringe a little
       gallery.draw(view, cards, Math.min(0.012, (Math.abs(vel) / step) * 0.0012));
 
-      if (nearest !== front) {
+      if (n && nearest !== front) {
         front = nearest;
         // Tick only when the visitor is turning it, not on the idle drift
         if (performance.now() - lastInput < 1200) tick();
@@ -334,9 +482,57 @@ const data = work.map((w: any) => ({
 
     window.addEventListener('resize', layout, { signal });
     mobile.addEventListener('change', () => {
-      if (mobile.matches) show(front % n);
+      if (mobile.matches) { if (n && !field.active) show(front % n); else { details.classList.remove('on'); shown = -1; } }
       else { setHover(-1); hide(); }
     }, { signal });
+
+    // ── Design / Photography / Experiments toggle ──
+    const switchEl = sec.querySelector<HTMLElement>('.switch')!;
+    const tabs = [...switchEl.querySelectorAll<HTMLButtonElement>('button')];
+    const pill = switchEl.querySelector<HTMLElement>('.switch-hl')!;
+    const placePill = (glide = true) => {
+      const b = tabs.find((t) => t.dataset.set === current)!;
+      pill.classList.toggle('glide', glide);
+      pill.style.width = `${b.offsetWidth}px`;
+      pill.style.transform = `translateX(${b.offsetLeft}px)`;
+    };
+    const markTabs = () => tabs.forEach((t) => t.setAttribute('aria-pressed', String(t.dataset.set === current)));
+    markTabs();
+    placePill(false);
+    let swapping: ReturnType<typeof gsap.timeline> | null = null;
+    const switchTo = (key: string) => {
+      if (key === current) return;
+      current = key;
+      memory.set = key;
+      markTabs();
+      placePill();
+      setHover(-1);
+      details.classList.remove('on'); shown = -1;
+      sec.querySelectorAll<HTMLElement>('.entry').forEach((e) => (e.hidden = true));
+      swapping?.kill();
+      // Fade the row out, swap the cards, then turn the new set in
+      swapping = gsap.timeline()
+        .to([canvas, empty], { opacity: 0, duration: rm ? 0.01 : 0.22, ease: 'power2.in' })
+        .add(() => {
+          data = itemsOf(key);
+          n = data.length;
+          entries = entriesOf(key);
+          gallery.setSources(data.map((d) => ({ src: d.img, tint: d.tint })));
+          layout();
+          useLayout(key);
+          theta = 0; front = -1;
+          vel = rm ? 0 : step * 6;
+        })
+        .to([canvas, empty], { opacity: 1, duration: rm ? 0.01 : 0.5, ease: 'power2.out' });
+    };
+    tabs.forEach((t) => t.addEventListener('click', () => switchTo(t.dataset.set!)));
+    window.addEventListener('resize', () => placePill(false), { signal });
+    document.fonts?.ready.then(() => placePill(false));
+    // Labels open and close (active tab, hover), changing the tabs' widths;
+    // keep the pill on the active tab as they do
+    const ro = new ResizeObserver(() => placePill(pill.classList.contains('glide')));
+    tabs.forEach((t) => ro.observe(t));
+    signal.addEventListener('abort', () => ro.disconnect());
 
     // Entrance plays as the loader dissolves, or straight away on later pages
     const intro = () => {
@@ -356,11 +552,12 @@ const data = work.map((w: any) => ({
     if (standIn) gsap.to(standIn, { opacity: 0, duration: 0.25, delay: 0.7, onComplete: () => standIn.remove() });
 
     return () => {
-      Object.assign(memory, { theta, visited: true });
+      Object.assign(memory, { theta, visited: true, set: current });
       ac.abort();
       gsap.ticker.remove(frame);
       clearTimeout(hideTimer);
       window.dispatchEvent(new CustomEvent('cursor:label', { detail: null }));
+      field.destroy();
       gallery.destroy();
     };
   });
@@ -373,6 +570,113 @@ const data = work.map((w: any) => ({
   :global(html:has(.projects)) { overflow: hidden; }
 
   .gl { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; display: block; }
+  /* Shown in place of the row when a tab has nothing in it yet */
+  .empty {
+    position: absolute; z-index: 2; left: 0; right: 0; top: 40%; margin: 0; max-width: none; text-align: center;
+    color: var(--mute); pointer-events: none;
+  }
+  .empty[hidden] { display: none; }
+
+  /* Photo titles in the field, running up each photo's right edge */
+  .field-labels { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+  .field-labels[hidden] { display: none; }
+  .field-labels :global(span) {
+    position: absolute; left: 0; top: 0; transform-origin: 0 0; white-space: nowrap;
+    font-size: var(--step--2); color: var(--mute); text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .field-labels :global(span[hidden]) { display: none; }
+  /* The field doesn't show a details card on phones (no card is "in front") */
+  @media (hover: none), (max-width: 760px) {
+    .is-field .details { display: none; }
+  }
+
+  /* A photo, full screen */
+  .lightbox {
+    position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;
+    margin: 0; padding: 0; border: 0; background: color-mix(in srgb, var(--bg) 94%, transparent);
+    color: var(--ink);
+  }
+  .lightbox::backdrop { background: transparent; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .lightbox[open] { display: grid; place-items: center; }
+  .lightbox img {
+    max-width: min(86vw, 1400px); max-height: 78svh; width: auto; height: auto;
+    border-radius: 6px; object-fit: contain; pointer-events: none;
+  }
+  .lb-bar {
+    position: absolute; left: calc(var(--gutter) + var(--pad)); right: calc(var(--gutter) + var(--pad));
+    bottom: clamp(1.25rem, 4vh, 2.5rem); display: flex; align-items: baseline; gap: 1.5rem;
+    pointer-events: none;
+  }
+  .lb-bar p { margin: 0; max-width: none; }
+  .lb-title { font-family: var(--font-display); font-size: var(--step-2); font-weight: 500; letter-spacing: -0.05em; line-height: 1; }
+  .lb-meta { color: var(--mute); font-size: var(--step--1); }
+  .lb-count { margin-left: auto !important; color: var(--mute); font-size: var(--step--1); }
+  .lightbox:focus { outline: none; }
+  /* Same as the nav's round buttons (Nav.astro) */
+  .lb-btn {
+    position: absolute; height: 2.75rem; min-width: 2.75rem; padding: 0; border-radius: 999px;
+    display: inline-flex; align-items: center;
+    background: var(--glass); border: 1px solid var(--line); color: var(--ink);
+    backdrop-filter: blur(8px);
+    transition: background-color 0.3s;
+  }
+  .lb-btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+  .lb-btn .ico {
+    flex: none; display: grid; place-items: center; width: calc(2.75rem - 2px); height: 100%;
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .lb-btn:active .ico { transform: scale(0.94); transition-duration: 60ms; }
+  .lb-btn .lbl { font-size: var(--step--1); font-weight: 500; letter-spacing: -0.01em; translate: 5px 0; }
+  .lb-btn .lbl > span > span { padding: 0 1rem 0 0; }
+  @media (hover: hover) and (pointer: fine) and (min-width: 761px) {
+    .lb-btn:hover .lbl, .lb-btn:focus-visible .lbl { grid-template-columns: 1fr; opacity: 1; translate: 0 0; }
+    .lb-btn:hover .ico { transform: scale(1.04); }
+  }
+  /* Where the nav's buttons sit */
+  .lb-close { top: 1.25rem; right: calc(var(--gutter) + var(--pad)); }
+  .lb-prev, .lb-next { top: 50%; translate: 0 -50%; }
+  .lb-prev { left: calc(var(--gutter) + var(--pad)); }
+  .lb-next { right: calc(var(--gutter) + var(--pad)); }
+  @media (max-width: 760px) {
+    .lightbox img { max-width: 92vw; max-height: 66svh; }
+    .lb-prev, .lb-next { top: auto; bottom: 5.5rem; translate: none; }
+    .lb-bar { flex-wrap: wrap; gap: 0.25rem 1rem; }
+    .lb-title { flex-basis: 100%; }
+  }
+
+  /* Design / Photography / Experiments, bottom middle; a lime pill slides to the
+     active tab */
+  .switch {
+    position: absolute; z-index: 310; left: 50%; bottom: clamp(1.5rem, 4vh, 2.5rem); translate: -50% 0;
+    display: flex; width: max-content; padding: 4px; border-radius: 999px;
+    background: var(--glass); border: 1px solid var(--line);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .switch[hidden] { display: none; }
+  .switch-hl {
+    position: absolute; left: 0; top: 4px; bottom: 4px; border-radius: 999px; background: var(--accent);
+  }
+  .switch-hl.glide { transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+  .switch button {
+    position: relative; z-index: 1; display: inline-flex; align-items: center;
+    padding: 0.55rem 0.75rem; border-radius: 999px; font-size: var(--step--1); font-weight: 500;
+    color: var(--mute); transition: color 0.25s;
+  }
+  .switch svg { flex: none; }
+  .switch button:hover { color: var(--ink); }
+  .switch button[aria-pressed='true'] { color: var(--accent-ink); }
+  .switch button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  /* Label: a 0fr → 1fr column, open on the active tab and on hover */
+  .lbl {
+    display: grid; grid-template-columns: 0fr; opacity: 0;
+    transition: grid-template-columns 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s;
+  }
+  .lbl > span { overflow: hidden; min-width: 0; }
+  .lbl > span > span { display: block; padding-left: 0.45rem; white-space: nowrap; }
+  .switch button[aria-pressed='true'] .lbl, .switch button:focus-visible .lbl { grid-template-columns: 1fr; opacity: 1; }
+  @media (hover: hover) and (pointer: fine) {
+    .switch button:hover .lbl { grid-template-columns: 1fr; opacity: 1; }
+  }
 
   /* Project details, bottom left: hidden until a card is hovered */
   /* Exactly one grid column wide (two on phones), inset from its lines like page content */
@@ -429,7 +733,10 @@ const data = work.map((w: any) => ({
   }
 
   @media (max-width: 760px) {
-    .details { --span: 2; }
+    /* The toggle takes the very bottom; the details sit just above it */
+    .details { --span: 2; bottom: calc(clamp(1.5rem, 4vh, 2.5rem) + 3.25rem); }
+    .switch { bottom: clamp(1rem, 3vh, 1.5rem); }
+    .switch button { padding: 0.55rem 0.8rem; }
     .sheet dt, .sheet dd { padding: 0.3rem 0; }
   }
 </style>

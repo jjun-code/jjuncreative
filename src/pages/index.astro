@@ -1,12 +1,14 @@
 ---
 import Base from '../layouts/Base.astro';
 import ProjectTrack from '../components/ProjectTrack.astro';
-import { getWork, getSite } from '../lib/content';
+import { getWork, getSite, getCollection } from '../lib/content';
 
 const site = await getSite();
 const work = await getWork();
+const photography = await getCollection('photography');
+const experiments = await getCollection('experiments');
 ---
 <Base footer={false}>
   <h1 class="visually-hidden">jjuncreative: {site.role}, {site.location}</h1>
-  <ProjectTrack work={work} />
+  <ProjectTrack work={work} photography={photography} experiments={experiments} />
 </Base>

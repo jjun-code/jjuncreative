@@ -225,10 +225,17 @@ button:hover .roll > span, button:focus-visible .roll > span { transform: transl
 }
 .cursor span {
   display: grid; place-items: center; width: 84px; height: 84px; margin: -42px 0 0 -42px;
+  /* Shape comes from a dithered pixel mask (scripts/cursor.ts); a plain circle
+     until it loads */
   border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+  /* 8 mask frames side by side, stepped through so the rim shimmers */
+  mask-size: 800% 100%; mask-repeat: no-repeat; -webkit-mask-size: 800% 100%; -webkit-mask-repeat: no-repeat;
+  animation: cursor-dither 0.8s steps(8, jump-none) infinite paused;
   font-size: var(--step--1); scale: 0; transition: scale 0.35s var(--ease);
 }
-.cursor.is-view span { scale: 1; }
+.cursor.is-view span { scale: 1; animation-play-state: running; }
+@keyframes cursor-dither { from { mask-position: 0% 0; -webkit-mask-position: 0% 0; } to { mask-position: 100% 0; -webkit-mask-position: 100% 0; } }
+@media (prefers-reduced-motion: reduce) { .cursor span { animation: none; } }
 
 /* ── Page transitions (Astro ClientRouter / view transitions) ──
    A quick, plain swap of the page underneath (the default additive cross-fade
