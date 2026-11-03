@@ -1,0 +1,139 @@
+---
+// A small "new message" window in the bottom-right corner, opened by any
+// [data-compose] link (the footer's "Send an email"). It posts to
+// /api/contact, which emails the message to the site owner. Without JS those
+// links stay plain mailto: links.
+const { email } = Astro.props;
+---
+<section class="compose" role="dialog" aria-labelledby="compose-title" hidden>
+  <header class="compose-head">
+    <p id="compose-title">New message</p>
+    <button type="button" class="compose-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" /></svg>
+    </button>
+  </header>
+  <form class="compose-form" novalidate>
+    <label><span class="mono">Your email</span><input name="email" type="email" autocomplete="email" required maxlength="200" /></label>
+    <label><span class="mono">Subject</span><input name="subject" type="text" required maxlength="150" /></label>
+    <label class="grow"><span class="mono">Message</span><textarea name="message" required maxlength="5000" rows="6"></textarea></label>
+    <!-- Spam traps: bots fill the hidden field; t records when the form opened -->
+    <input class="trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+    <input type="hidden" name="t" />
+    <div class="compose-foot">
+      <p class="status mono" aria-live="polite"></p>
+      <button type="submit" class="send">Send</button>
+    </div>
+  </form>
+  <div class="sent" hidden>
+    <p class="sent-title">Message sent.</p>
+    <p class="mono">Thanks, I'll get back to you soon.</p>
+  </div>
+  <p class="fallback mono">Or email <a href={`mailto:${email}`}>{email}</a></p>
+</section>
+
+<script>
+  import { gsap, reduced } from '../scripts/smooth';
+  import { onPage } from '../scripts/page';
+
+  onPage(() => {
+    const box = document.querySelector<HTMLElement>('.compose');
+    const triggers = [...document.querySelectorAll<HTMLAnchorElement>('[data-compose]')];
+    if (!box || !triggers.length) return;
+    const form = box.querySelector<HTMLFormElement>('.compose-form')!;
+    const status = box.querySelector<HTMLElement>('.status')!;
+    const sent = box.querySelector<HTMLElement>('.sent')!;
+    const send = box.querySelector<HTMLButtonElement>('.send')!;
+    const rm = reduced();
+    const ac = new AbortController();
+    let tl: ReturnType<typeof gsap.timeline> | null = null;
+
+    // Grows out of the bottom-right corner, like a chat window
+    const open = () => {
+      if (!box.hidden) return;
+      box.hidden = false;
+      form.hidden = false; sent.hidden = true; status.textContent = '';
+      (form.elements.namedItem('t') as HTMLInputElement).value = String(Date.now());
+      tl?.kill();
+      tl = gsap.timeline()
+        .fromTo(box, { clipPath: 'inset(100% 0% 0% 100% round 24px)', y: 12 }, { clipPath: 'inset(0% 0% 0% 0% round 24px)', y: 0, duration: rm ? 0.01 : 0.45, ease: 'expo.out' });
+      (form.elements.namedItem('email') as HTMLInputElement).focus({ preventScroll: true });
+    };
+    const close = () => {
+      if (box.hidden) return;
+      tl?.kill();
+      tl = gsap.timeline({ onComplete: () => { box.hidden = true; } })
+        .to(box, { clipPath: 'inset(100% 0% 0% 100% round 24px)', y: 12, duration: rm ? 0.01 : 0.3, ease: 'power3.in' });
+    };
+
+    triggers.forEach((a) => a.addEventListener('click', (e) => { e.preventDefault(); open(); }));
+    box.querySelector('.compose-close')!.addEventListener('click', close);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { signal: ac.signal });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.reportValidity()) return;
+      send.disabled = true;
+      status.textContent = 'Sending…';
+      try {
+        const res = await fetch('/api/contact', { method: 'POST', body: new FormData(form) });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || 'Couldn’t send right now.');
+        form.reset();
+        form.hidden = true; sent.hidden = false;
+        status.textContent = '';
+        setTimeout(close, 2600);
+      } catch (err) {
+        status.textContent = (err as Error).message || 'Couldn’t send right now.';
+      } finally {
+        send.disabled = false;
+      }
+    });
+
+    return () => ac.abort();
+  });
+</script>
+
+<style>
+  /* Dark floating window, like the menu panel, whatever the page theme */
+  .compose {
+    position: fixed; z-index: 70; right: var(--gutter); bottom: var(--gutter);
+    width: min(380px, calc(100vw - 2 * var(--gutter)));
+    display: grid; gap: 0.25rem; padding: 0 8px 12px; border-radius: 24px;
+    background: #1c1c1ce8; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    box-shadow: inset 0 0 0 1px #ffffff38, 0 16px 48px #00000059;
+    color: #fff; font-size: var(--step-0); font-weight: 500; letter-spacing: -0.02em;
+  }
+  .compose[hidden] { display: none; }
+  .compose-head { display: flex; align-items: center; justify-content: space-between; height: 56px; padding: 0 6px 0 16px; color: #ffffffad; }
+  .compose-head p { margin: 0; }
+  .compose-close { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: #ffffffad; transition: color 0.15s, background-color 0.15s; }
+  .compose-close:hover { color: #fff; background: #ffffff14; }
+
+  .compose-form { display: grid; gap: 8px; }
+  .compose-form[hidden] { display: none; }
+  label { display: grid; gap: 4px; padding: 10px 12px; border-radius: 14px; background: #ffffff0d; transition: background-color 0.15s; }
+  label:focus-within { background: #ffffff17; }
+  label .mono { color: #ffffff80; }
+  input, textarea {
+    width: 100%; border: 0; outline: 0; background: transparent; color: #fff; padding: 0;
+    font: inherit; letter-spacing: inherit; resize: none;
+  }
+  textarea { min-height: 7.5rem; line-height: 1.4; }
+  .trap { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+
+  .compose-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 4px 0 12px; }
+  .status { margin: 0; color: #ffffffad; text-transform: none; }
+  .send {
+    padding: 0.7rem 1.4rem; border-radius: 999px; background: var(--accent); color: var(--accent-ink);
+    font-weight: 600; transition: transform 0.2s var(--ease), opacity 0.2s;
+  }
+  .send:hover { transform: scale(1.04); }
+  .send:disabled { opacity: 0.6; transform: none; }
+
+  .sent { padding: 18px 16px 8px; }
+  .sent[hidden] { display: none; }
+  .sent-title { margin: 0 0 0.3rem; font-size: var(--step-1); }
+  .sent .mono { margin: 0; color: #ffffffad; text-transform: none; }
+  .fallback { margin: 6px 12px 0; color: #ffffff66; text-transform: none; }
+  .fallback a { color: #ffffffad; border-bottom: 1px solid #ffffff38; }
+</style>

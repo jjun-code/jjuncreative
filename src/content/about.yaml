@@ -46,6 +46,10 @@ toolkit:
     use: productivity
   - name: Claude
     use: building
+  - name: GitHub
+    use: development
+  - name: Cloudflare
+    use: deployment
   - name: Adobe Suite
     use: visual design
   - name: Steam
