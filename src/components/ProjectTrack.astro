@@ -24,14 +24,18 @@ const sets = [
   },
   {
     key: 'journal', label: 'Visual journal',
-    items: journal.map((j: any) => ({
-      title: j.title, img: img(j.image), tint: j.color || '#2a2a2a', href: j.link || '', slug: j.slug,
-      facts: [['Type', kinds[j.kind]], ['Source', j.source], ['Year', j.year]], tools: [], summary: j.description, cta: 'Visit',
-      meta: [j.source, j.year].filter(Boolean).join(' · '),
-      kind: j.kind || 'image', video: j.video || '',
-      // A series: the extra images after the main one
-      more: (j.more ?? []).filter((m: any) => m.image).map((m: any) => ({ img: m.image, caption: m.caption || '' })),
-    })),
+    // An entry with a video file is a video, whatever its Type says
+    items: journal.map((j: any) => {
+      const kind = j.video ? 'video' : j.kind || 'image';
+      return {
+        title: j.title, img: img(j.image), tint: j.color || '#2a2a2a', href: j.link || '', slug: j.slug,
+        facts: [['Type', kinds[kind]], ['Source', j.source], ['Year', j.year]], tools: [], summary: j.description, cta: 'Visit',
+        meta: [j.source, j.year].filter(Boolean).join(' · '),
+        kind, video: j.video || '',
+        // A series: the extra images after the main one
+        more: (j.more ?? []).filter((m: any) => m.image).map((m: any) => ({ img: m.image, caption: m.caption || '' })),
+      };
+    }),
   },
 ];
 // Tab icons, 20×20 line drawings: pen nib, sparkle
@@ -275,8 +279,14 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
       let m: HTMLElement;
       if (extra) {
         m = make('img', { src: extra.img, alt: extra.caption || it.title });
-      } else if (it.kind === 'video' && it.video) {
-        m = make('video', { src: it.video, poster: it.img, controls: true, autoplay: true, muted: true, loop: true, playsInline: true });
+      } else if (it.video) {
+        // Muted so browsers allow it to start on its own; the controls can unmute
+        const v = make('video', { src: it.video, poster: it.img, controls: true, autoplay: true, muted: true, loop: true, playsInline: true, preload: 'auto' });
+        // No download button or picture-in-picture in the controls
+        v.setAttribute('controlslist', 'nodownload noremoteplayback');
+        v.disablePictureInPicture = true;
+        v.play().catch(() => {});
+        m = v;
       } else if (embed) {
         m = make('iframe', { src: embed, title: it.title, allow: 'autoplay; fullscreen; picture-in-picture', allowFullscreen: true, className: 'embed' });
       } else {
