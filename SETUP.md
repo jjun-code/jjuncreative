@@ -22,7 +22,7 @@ After this, you edit everything at **yoursite.com/keystatic**.
 1. Go to **keystatic.cloud** and sign in with GitHub.
 2. Create a team (any name, e.g. your name), then **Create project** → name it `jjuncreative`.
 3. Connect it to the `jjuncreative` GitHub repo when asked and approve access.
-4. Note the project's ID. It looks like `your-team/jjuncreative`. You'll need it in step 3.
+4. The project's ID (`jjuncreative/jjuncreative`) is set in `keystatic.config.ts`. If you ever move to a different Keystatic Cloud project, change it there.
 
 ## 3. Host it on Cloudflare Workers (free)
 
@@ -32,7 +32,6 @@ After this, you edit everything at **yoursite.com/keystatic**.
    - Build command: `npm run build`
    - Deploy command: `npx wrangler deploy`
 4. Under **Build variables**, add:
-   - `PUBLIC_KEYSTATIC_PROJECT` = the ID from step 2 (e.g. `your-team/jjuncreative`)
    - `NODE_VERSION` = `24`
 5. Click **Deploy**. In a couple of minutes you'll get a `something.workers.dev` link.
 6. Back in Keystatic Cloud, open your project settings and add that site URL if asked.

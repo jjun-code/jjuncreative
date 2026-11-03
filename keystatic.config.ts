@@ -1,8 +1,9 @@
 import { config, fields, collection, singleton } from '@keystatic/core';
 
-// Local files while developing; Keystatic Cloud (saves to your GitHub repo) once live.
-// Set PUBLIC_KEYSTATIC_PROJECT (e.g. "your-team/jjuncreative") in Cloudflare's environment variables.
-const project = import.meta.env.PUBLIC_KEYSTATIC_PROJECT || 'your-team/jjuncreative';
+// Local files while developing; Keystatic Cloud (saves to the GitHub repo) once live.
+// The Keystatic Cloud project (team/project); not a secret. PUBLIC_KEYSTATIC_PROJECT
+// can override it at build time.
+const project = import.meta.env.PUBLIC_KEYSTATIC_PROJECT || 'jjuncreative/jjuncreative';
 
 const imageWithFallback = (label: string, directory: string, publicPath: string) => ({
   image: fields.image({ label, directory, publicPath }),
