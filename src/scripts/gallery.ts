@@ -1,8 +1,11 @@
-/* WebGL renderer for the home page project row. Cards are curved planes on a
-   large cylinder seen from outside, drawn into an offscreen buffer; a second
-   Gaussian blur, run across then down, adds a lens-like chromatic aberration
-   and a soft blur that grow toward the screen edges (and with scroll speed). The DOM keeps the labels,
-   details panel and links; this only draws pixels. */
+/* WebGL renderer for the home page. Two layouts share it: the project row
+   (cards are curved planes on a large cylinder seen from outside) and the
+   photo field (flat cards placed anywhere, given as screen rectangles). Cards
+   are drawn into an offscreen buffer; a Gaussian blur, run across then down,
+   adds a lens-like warp, chromatic aberration and soft blur that grow toward
+   the screen edges (and with scroll speed): along the sides for the row, all
+   round like a fisheye for the field. The DOM keeps the details panel and
+   links; this only draws pixels. */
 
 export type View = {
   W: number; H: number; // viewport, CSS px
@@ -12,7 +15,29 @@ export type View = {
   horizon: number; // how far above the row the vanishing point sits
   cy: number; // row centre, from the top
 };
-export type CardDraw = { tex: number; angle: number; arc: number; cw: number; ch: number }; // this card's size
+// A row card (angle/arc on the cylinder), or a flat card when rect is given
+// ([x, y, w, h] in CSS px, before the lens)
+export type CardDraw = { tex: number; angle: number; arc: number; cw: number; ch: number; rect?: [number, number, number, number] };
+
+// ── The field's fisheye, mirrored in JS so labels and hover line up with it ──
+export const FIELD_LENS = 0.2;
+const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+/** Screen point → the point of the undistorted scene drawn there. */
+export function lensSource(x: number, y: number, W: number, H: number): [number, number] {
+  const a = W / H, ux = x / W - 0.5, uy = y / H - 0.5;
+  const r = Math.hypot(ux * a, uy) / Math.hypot(a * 0.5, 0.5);
+  const l = smooth(0.2, 1, r), k = 1 / (1 + FIELD_LENS * l * l);
+  return [W * (0.5 + ux * k), H * (0.5 + uy * k)];
+}
+/** Undistorted scene point → where it appears on screen (inverse, by iteration). */
+export function lensScreen(x: number, y: number, W: number, H: number): [number, number] {
+  let dx = x, dy = y;
+  for (let i = 0; i < 8; i++) {
+    const [sx, sy] = lensSource(dx, dy, W, H);
+    dx += x - sx; dy += y - sy;
+  }
+  return [dx, dy];
+}
 
 // Screen position (CSS px) of a point on a card: u/v 0–1 across/down the card.
 // Cards hang from a common top line, so a taller card only extends further down.
@@ -26,16 +51,22 @@ export function project(v: View, angle: number, arc: number, u: number, vv: numb
 
 const CARD_VS = `#version 300 es
 in vec2 aUv;
-uniform float uAngle, uArc, uR, uCh, uTop, uP, uHorizon, uCy;
+uniform float uAngle, uArc, uR, uCh, uTop, uP, uHorizon, uCy, uFlat;
 uniform vec2 uRes;
+uniform vec4 uRect; // flat cards: x, y, w, h in px
 out vec2 vUv;
 void main() {
   vUv = aUv;
-  float a = uAngle + (aUv.x - 0.5) * uArc;
-  float x = uR * sin(a), z = uR * cos(a) - uR;
-  float y = uTop + aUv.y * uCh;
-  float s = uP / (uP - z);
-  vec2 px = vec2(uRes.x * 0.5 + x * s, uCy - uHorizon + (y + uHorizon) * s);
+  vec2 px;
+  if (uFlat > 0.5) {
+    px = uRect.xy + aUv * uRect.zw;
+  } else {
+    float a = uAngle + (aUv.x - 0.5) * uArc;
+    float x = uR * sin(a), z = uR * cos(a) - uR;
+    float y = uTop + aUv.y * uCh;
+    float s = uP / (uP - z);
+    px = vec2(uRes.x * 0.5 + x * s, uCy - uHorizon + (y + uHorizon) * s);
+  }
   gl_Position = vec4(px.x / uRes.x * 2.0 - 1.0, 1.0 - px.y / uRes.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -70,20 +101,46 @@ in vec2 vUv;
 uniform sampler2D uScene;
 uniform vec2 uRes, uDir; // uDir: (1, 0) across, (0, 1) down
 uniform float uCA, uVel, uSplit; // uSplit: 1 on the pass that also splits colour
+uniform float uLens, uCenterY; // edge lens bulge, and the height (uv) it centres on
+uniform float uRadial, uFieldLens; // 1: the photo field's all-round fisheye
 out vec4 o;
 void main() {
   float dx = vUv.x - 0.5;
-  // 0 across the middle, easing in toward the left and right edges
-  float e = smoothstep(0.2, 0.5, abs(dx));
+  vec2 src = vUv;
+  vec2 dir = vec2(sign(dx), 0.0); // which way the colour splits
+  float e;
+  if (uRadial > 0.5) {
+    // Fisheye: magnified toward every edge, strongest in the corners
+    // (mirrored by lensSource in JS)
+    float aspect = uRes.x / uRes.y;
+    vec2 q = (vUv - 0.5) * vec2(aspect, 1.0);
+    float r = length(q) / length(vec2(aspect, 1.0) * 0.5);
+    if (uSplit > 0.5) {
+      float l = smoothstep(0.2, 1.0, r);
+      src = 0.5 + (vUv - 0.5) / (1.0 + uFieldLens * l * l);
+    }
+    e = smoothstep(0.35, 1.0, r);
+    dir = normalize(vUv - 0.5 + 1e-5);
+  } else {
+    // Lens distortion (first pass only): toward the left and right edges the
+    // image is magnified vertically about the row, so cards there grow taller
+    // and their top and bottom edges bow outward, like a wide-angle lens
+    if (uSplit > 0.5) {
+      float l = smoothstep(0.12, 0.5, abs(dx));
+      src.y = uCenterY + (vUv.y - uCenterY) / (1.0 + uLens * l * l);
+    }
+    // 0 across the middle, easing in toward the left and right edges
+    e = smoothstep(0.2, 0.5, abs(dx));
+  }
   e *= e;
   // Turning fast adds to it, mostly at the sides so the middle stays readable
   float v = uVel * (0.25 + 0.75 * e);
   float reach = e * 18.0 + v * 600.0; // blur reach in px (about 3 sigma)
   float k = (e * uCA + v * 0.4) * uSplit; // colour split, in uv (gentle; the blur does most of the work)
   // The middle stays sharp (and cheap)
-  if (reach < 0.5 && k < 0.0002) { o = texture(uScene, vUv); return; }
+  if (reach < 0.5 && k < 0.0002) { o = texture(uScene, src); return; }
   vec2 stepUv = uDir * (reach / 6.0) / uRes;
-  vec2 off = vec2(sign(dx) * k, 0.0);
+  vec2 off = dir * k;
   // 13 taps with Gaussian weights (sigma = 2 taps). On the colour pass each tap
   // reads red, green and blue from slightly different places; the blur then
   // smears those apart into a soft gradient rather than hard copies
@@ -91,7 +148,7 @@ void main() {
   float wsum = 0.0;
   for (int i = -6; i <= 6; i++) {
     float w = exp(-float(i * i) / 8.0);
-    vec2 uv = vUv + stepUv * float(i);
+    vec2 uv = src + stepUv * float(i);
     vec4 c;
     if (uSplit > 0.5) {
       vec4 r = texture(uScene, uv - off), g = texture(uScene, uv), bl = texture(uScene, uv + off);
@@ -155,8 +212,9 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   gl.bindVertexArray(null);
   const empty = gl.createVertexArray()!;
 
-  // Project images, loaded in the background; cards show their tint until then
-  const tex = sources.map((s) => {
+  // Card images, loaded in the background; cards show their tint until then
+  type Tex = { tex: WebGLTexture; tint: number[]; aspect: number; loaded: number };
+  const load = (s: { src: string; tint: string }): Tex => {
     const t = { tex: gl.createTexture()!, tint: hex(s.tint), aspect: 1, loaded: 0 };
     const img = new Image();
     img.decoding = 'async';
@@ -172,9 +230,14 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
     };
     if (s.src) img.src = s.src;
     return t;
-  });
+  };
+  let tex = sources.map(load);
+  /** Swap in a different set of card images (the home page's tabs). */
+  const setSources = (next: { src: string; tint: string }[]) => {
+    tex.forEach((t) => gl.deleteTexture(t.tex));
+    tex = next.map(load);
+  };
 
-  // Offscreen buffer the cards are drawn into before the lens pass
   // Offscreen buffers: the cards are drawn into the first, blurred across
   // (with the colour split) into the second, then blurred down onto the screen
   const targets = [0, 1].map(() => ({ fbo: gl.createFramebuffer()!, tex: gl.createTexture()! }));
@@ -197,8 +260,9 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   };
   resize();
 
-  /** Cards must come back to front. vel: scroll speed, adds to the effect. */
-  const draw = (v: View, cards: CardDraw[], vel: number) => {
+  /** Cards must come back to front. vel: scroll speed, adds to the effect.
+      radial: the photo field's fisheye instead of the row's side lens. */
+  const draw = (v: View, cards: CardDraw[], vel: number, radial = false) => {
     gl.viewport(0, 0, w, h);
     gl.bindFramebuffer(gl.FRAMEBUFFER, targets[0].fbo);
     gl.clearColor(0, 0, 0, 0);
@@ -218,7 +282,10 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
     gl.uniform1i(cu('uTex'), 0);
     for (const c of cards) {
       const t = tex[c.tex];
+      if (!t) continue;
       const cardAspect = c.cw / c.ch;
+      gl.uniform1f(cu('uFlat'), c.rect ? 1 : 0);
+      if (c.rect) gl.uniform4f(cu('uRect'), c.rect[0], c.rect[1], c.rect[2], c.rect[3]);
       gl.uniform1f(cu('uCh'), c.ch);
       gl.uniform2f(cu('uSize'), c.cw, c.ch);
       gl.bindTexture(gl.TEXTURE_2D, t.tex);
@@ -237,6 +304,11 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
     gl.uniform2f(pu('uRes'), w, h);
     gl.uniform1f(pu('uCA'), 0.006); // colour split at the very edge, in uv
     gl.uniform1f(pu('uVel'), vel);
+    gl.uniform1f(pu('uLens'), 0.24);
+    gl.uniform1f(pu('uRadial'), radial ? 1 : 0);
+    gl.uniform1f(pu('uFieldLens'), FIELD_LENS);
+    // Centre the bulge on the side cards (squares hanging from the row's top)
+    gl.uniform1f(pu('uCenterY'), 1 - (v.cy - v.ch / 2 + v.cw / 2) / v.H);
     // Across, with the colour split, into the second buffer…
     gl.bindFramebuffer(gl.FRAMEBUFFER, targets[1].fbo);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -253,6 +325,9 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 
+  /** A card image's width/height, once loaded (null before). */
+  const aspectOf = (i: number) => (tex[i]?.loaded ? tex[i].aspect : null);
+
   const destroy = () => gl.getExtension('WEBGL_lose_context')?.loseContext();
-  return { draw, resize, destroy };
+  return { draw, resize, setSources, aspectOf, destroy };
 }

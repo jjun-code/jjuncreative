@@ -19,7 +19,7 @@ export default config({
   ui: {
     brand: { name: 'jjuncreative' },
     navigation: {
-      Work: ['work'],
+      Work: ['work', 'photography', 'experiments'],
       Pages: ['home', 'about', 'site'],
     },
   },
@@ -100,6 +100,56 @@ export default config({
             image: { directory: 'public/images/work', publicPath: '/images/work/' },
           },
         }),
+      },
+    }),
+
+    // Photography and Experiments: lighter items shown in the home carousel
+    // under their own tabs. Clicking one opens its link, if it has one.
+    photography: collection({
+      label: 'Photography',
+      slugField: 'title',
+      path: 'src/content/photography/*',
+      format: 'yaml',
+      columns: ['title', 'year'],
+      schema: {
+        title: fields.slug({ name: { label: 'Title' } }),
+        year: fields.integer({ label: 'Year' }),
+        image: fields.image({
+          label: 'Photo',
+          description: 'Export at about 2400px on the long edge, JPEG or WebP, with location data removed.',
+          directory: 'public/images/photography',
+          publicPath: '/images/photography/',
+          validation: { isRequired: true },
+        }),
+        location: fields.text({ label: 'Location', description: 'Shown in the details, e.g. Tokyo, Japan' }),
+        description: fields.text({ label: 'Description', multiline: true }),
+        link: fields.url({ label: 'Link', description: 'Optional: where clicking the card goes, e.g. an album or Instagram post' }),
+        color: fields.text({ label: 'Colour', description: 'Hex value, shown while the photo loads', defaultValue: '#2a2a2a' }),
+        order: fields.integer({ label: 'Sort order', description: 'Lower numbers show first. Leave blank to sort by year.' }),
+      },
+    }),
+
+    experiments: collection({
+      label: 'Experiments',
+      slugField: 'title',
+      path: 'src/content/experiments/*',
+      format: 'yaml',
+      columns: ['title', 'year'],
+      schema: {
+        title: fields.slug({ name: { label: 'Title' } }),
+        year: fields.integer({ label: 'Year' }),
+        image: fields.image({
+          label: 'Cover image',
+          directory: 'public/images/experiments',
+          publicPath: '/images/experiments/',
+          validation: { isRequired: true },
+        }),
+        category: fields.text({ label: 'Type', description: 'e.g. WebGL, Motion, 3D' }),
+        tools: fields.array(fields.text({ label: 'Tool' }), { label: 'Tools', itemLabel: (p) => p.value }),
+        description: fields.text({ label: 'Description', multiline: true }),
+        link: fields.url({ label: 'Link', description: 'Optional: where clicking the card goes, e.g. a live demo or video' }),
+        color: fields.text({ label: 'Colour', description: 'Hex value, shown while the image loads', defaultValue: '#2a2a2a' }),
+        order: fields.integer({ label: 'Sort order', description: 'Lower numbers show first. Leave blank to sort by year.' }),
       },
     }),
   },
