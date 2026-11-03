@@ -13,15 +13,17 @@ const logos: Record<string, { path: string; hex: string }> = {
   github: siGithub, cloudflare: siCloudflare,
 };
 const logoFor = (name: string) => logos[name.toLowerCase().split(/\s+/)[0]];
-// Black brand colours would vanish on the dark theme, so they use the text colour
-const brand = (hex: string) => (['000000', '191919', '181717'].includes(hex) ? 'var(--ink)' : `#${hex}`);
+// Black brand colours would vanish on the dark theme, so they flood near-white
+// with near-black on top, the same in both themes
+const LIGHT = '#f3f3f3', DARK = '#0b0b0b';
+const brand = (hex: string) => (['000000', '191919', '181717'].includes(hex) ? LIGHT : `#${hex}`);
 // Each card floods with its brand colour on hover; the logo then switches to
 // whichever of white or near-black reads on that colour
 const colours = (name: string) => {
   const hex = logoFor(name)?.hex;
-  if (!hex) return { brand: 'var(--ink)', on: 'var(--bg)' };
+  if (!hex) return { brand: LIGHT, on: DARK };
   const b = brand(hex);
-  if (b.startsWith('var(')) return { brand: b, on: 'var(--bg)' };
+  if (b === LIGHT) return { brand: b, on: DARK };
   const [r, g, bl] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * bl;
   return { brand: b, on: lum > 0.6 ? '#141414' : '#ffffff' };
@@ -41,10 +43,10 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
     <div class="hello c-2" data-reveal>
       <p class="h3">{a.hello}</p>
       <dl class="stats">
-        {a.stats.map((s, i) => (
+        {a.stats.map((s) => (
           <div>
-            <dt class="label">{String(i + 1).padStart(2, '0')}. {s.label}</dt>
-            <dd>{s.value}</dd>
+            <dt class="label">{s.label}</dt>
+            <dd><span class="chip">{s.value}</span></dd>
           </div>
         ))}
       </dl>
@@ -219,7 +221,7 @@ const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
   .hello .h3 { max-width: 24ch; margin: 0; }
   .stats { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
   .stats div { border-top: 1px solid var(--line); padding-top: 0.8rem; }
-  .stats .label { margin-bottom: 0.3rem; }
+  .stats .label { margin-bottom: 0.6rem; }
   .stats dd { margin: 0; }
 
   .block { margin-top: clamp(4rem, 9vw, 8rem); }
