@@ -30,7 +30,7 @@ const colours = (name: string) => {
 const m = a.headline.match(/^(.+?[.,])\s+(.+)$/);
 const [lead, rest] = m ? [m[1], m[2]] : [a.headline, ''];
 ---
-<Base title="About">
+<Base title="About" description={`${a.headline} Based in Auckland, NZ.`}>
   <section class="grid intro">
     <p class="label c-full">About</p>
     <h1 class="h1 c-3">{lead} {rest && <span class="mute">{rest}</span>}</h1>

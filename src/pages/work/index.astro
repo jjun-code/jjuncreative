@@ -4,7 +4,7 @@ import { getWork, src } from '../../lib/content';
 const work = await getWork();
 const categories = [...new Set(work.map((w) => w.category).filter(Boolean))];
 ---
-<Base title="Work">
+<Base title="Work" description={`UX/UI product design work: ${work.map((w) => w.title).join(', ')}.`}>
   <section class="index grid">
     <h1 class="h1 head c-full">All <span class="mute">work</span></h1>
 

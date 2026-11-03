@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /keystatic
+Disallow: /api/
+
+Sitemap: https://www.jjuncreative.com/sitemap.xml
