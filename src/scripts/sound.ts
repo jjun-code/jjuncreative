@@ -1,5 +1,6 @@
 /* Interface sounds, played with Web Audio: a tick when scrolling through the
-   projects, a soft tap when pressing buttons, and a hum when opening a project.
+   projects, a soft tap when pressing buttons, and a hum when opening a project;
+   plus a quiet background music track (below).
    Browsers only allow audio after the visitor clicks, taps or presses a key,
    so the context is created on the first such gesture; ticks before that are
    silently skipped. The on/off choice is remembered (nav sound button). */
@@ -17,7 +18,7 @@ export const isMuted = () => {
 export function setMuted(off: boolean) {
   try { localStorage.setItem(KEY, off ? 'off' : 'on'); } catch {}
   window.dispatchEvent(new CustomEvent('soundchange', { detail: !off }));
-  if (!off) unlock();
+  if (!off) { unlock(); playMusic(); } else pauseMusic();
 }
 
 function unlock() {
@@ -34,8 +35,71 @@ function unlock() {
   if (ctx.state === 'suspended') ctx.resume();
 }
 
+/* ── Background music ──
+   A looping track that follows the same on/off switch. It fades in on the
+   visitor's first click, tap or key press (browsers block sound before that),
+   pauses while the tab is hidden, and carries on across page changes (pages
+   swap without a reload, and the player isn't part of the page). Its volume
+   goes through a Web Audio gain, since iPhones ignore a media element's own
+   volume. Ogg where the browser plays it (smaller), MP3 elsewhere (Safari). */
+const MUSIC_SRC = { ogg: '/audio/quiet-horizon.ogg', mp3: '/audio/quiet-horizon.mp3' };
+const MUSIC_VOLUME = 0.132; // quiet: well under the interface sounds
+const POS_KEY = 'music-pos';
+let music: HTMLAudioElement | null = null;
+let gain: GainNode | null = null;
+
+function getMusic() {
+  if (music) return music;
+  const a = new Audio();
+  a.src = a.canPlayType('audio/ogg; codecs="vorbis"') ? MUSIC_SRC.ogg : MUSIC_SRC.mp3;
+  a.loop = true;
+  a.preload = 'none';
+  try {
+    const pos = Number(sessionStorage.getItem(POS_KEY));
+    if (pos > 0) a.currentTime = pos;
+  } catch {}
+  return (music = a);
+}
+
+// Route the track through a gain once the audio context exists
+function connect(a: HTMLAudioElement) {
+  if (gain || !ctx) return;
+  gain = ctx.createGain();
+  gain.gain.value = 0;
+  ctx.createMediaElementSource(a).connect(gain).connect(ctx.destination);
+}
+
+// Smoothly towards a volume (the time constant is about a third of the fade)
+function fadeTo(target: number, seconds: number) {
+  if (!gain || !ctx) return;
+  gain.gain.cancelScheduledValues(ctx.currentTime);
+  gain.gain.setTargetAtTime(target, ctx.currentTime, seconds / 3);
+}
+
+function playMusic() {
+  const a = getMusic();
+  if (!a || !ctx || isMuted() || document.hidden) return;
+  connect(a);
+  if (!a.paused) { fadeTo(MUSIC_VOLUME, 0.6); return; }
+  // Rejected until the visitor has interacted; the gesture listeners retry
+  a.play().then(() => fadeTo(MUSIC_VOLUME, 2.5), () => {});
+}
+
+let pauseTimer = 0;
+function pauseMusic() {
+  if (!music || music.paused) return;
+  fadeTo(0, 0.4);
+  clearTimeout(pauseTimer);
+  pauseTimer = window.setTimeout(() => { if (isMuted() || document.hidden) music?.pause(); }, 500);
+}
+
+document.addEventListener('visibilitychange', () => (document.hidden ? pauseMusic() : playMusic()));
+window.addEventListener('pagehide', () => {
+  try { if (music) sessionStorage.setItem(POS_KEY, String(music.currentTime)); } catch {}
+});
+
 for (const ev of ['pointerdown', 'keydown', 'touchend']) {
-  window.addEventListener(ev, () => { if (!isMuted()) unlock(); }, { passive: true });
+  window.addEventListener(ev, () => { if (!isMuted()) { unlock(); playMusic(); } }, { passive: true });
 }
 
 /** A soft, short "pop" for pressing buttons, synthesised so there's no file:
