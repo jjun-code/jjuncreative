@@ -38,13 +38,13 @@ function unlock() {
 /* ── Background music ──
    A looping track that follows the same on/off switch. It fades in on the
    visitor's first click, tap or key press (browsers block sound before that),
-   keeps playing when the tab is in the background, and carries on across page changes (pages
+   keeps playing when the tab is in the background, starts from the top on
+   every load or refresh, and carries on across page changes (pages
    swap without a reload, and the player isn't part of the page). Its volume
    goes through a Web Audio gain, since iPhones ignore a media element's own
    volume. Ogg where the browser plays it (smaller), MP3 elsewhere (Safari). */
 const MUSIC_SRC = { ogg: '/audio/tidal-veil.ogg', mp3: '/audio/tidal-veil.mp3' };
 const MUSIC_VOLUME = 0.132; // quiet: well under the interface sounds
-const POS_KEY = 'music-pos';
 let music: HTMLAudioElement | null = null;
 let gain: GainNode | null = null;
 
@@ -54,10 +54,6 @@ function getMusic() {
   a.src = a.canPlayType('audio/ogg; codecs="vorbis"') ? MUSIC_SRC.ogg : MUSIC_SRC.mp3;
   a.loop = true;
   a.preload = 'none';
-  try {
-    const pos = Number(sessionStorage.getItem(POS_KEY));
-    if (pos > 0) a.currentTime = pos;
-  } catch {}
   return (music = a);
 }
 
@@ -93,9 +89,6 @@ function pauseMusic() {
   pauseTimer = window.setTimeout(() => { if (isMuted()) music?.pause(); }, 500);
 }
 
-window.addEventListener('pagehide', () => {
-  try { if (music) sessionStorage.setItem(POS_KEY, String(music.currentTime)); } catch {}
-});
 
 for (const ev of ['pointerdown', 'keydown', 'touchend']) {
   window.addEventListener(ev, () => { if (!isMuted()) { unlock(); playMusic(); } }, { passive: true });
