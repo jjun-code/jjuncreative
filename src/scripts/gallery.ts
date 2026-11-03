@@ -213,20 +213,68 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   const empty = gl.createVertexArray()!;
 
   // Card images, loaded in the background; cards show their tint until then.
-  // Animated GIFs play: their frames are decoded one at a time (ImageDecoder,
-  // where the browser has it; elsewhere they show their first frame) and
-  // swapped into the texture on each frame's own timing
-  type Gif = { dec: any; count: number; i: number; next: number; busy: boolean };
-  type Tex = { tex: WebGLTexture; tint: number[]; aspect: number; loaded: number; gif?: Gif; dead?: boolean };
+  // Animated GIFs play: their frames are decoded one at a time and swapped
+  // into the texture on each frame's own timing. Browsers with ImageDecoder
+  // (Chrome, Edge, Firefox) decode natively; the rest (Safari, so iPhones)
+  // decode in script with gifuct-js, loaded only when needed. Only GIFs that
+  // were on screen recently are advanced, to spare phones the work.
+  type Frame = { source: TexImageSource; ms: number; done: () => void };
+  type Gif = { count: number; i: number; next: number; busy: boolean; frame: (i: number) => Promise<Frame>; close: () => void };
+  type Tex = { tex: WebGLTexture; tint: number[]; aspect: number; loaded: number; gif?: Gif; dead?: boolean; seen?: number };
   const Decoder = (window as any).ImageDecoder;
+  // Native: the browser decodes each frame on request
+  const nativeGif = async (src: string): Promise<Gif | null> => {
+    const res = await fetch(src);
+    const dec = new Decoder({ data: res.body, type: 'image/gif' });
+    await dec.completed; // the frame count is only known once it's all read
+    const count = dec.tracks.selectedTrack?.frameCount ?? 1;
+    if (count < 2) { dec.close(); return null; }
+    return {
+      count, i: 1, next: 0, busy: false,
+      frame: (i) => dec.decode({ frameIndex: i }).then(({ image }: { image: VideoFrame }) => ({
+        source: image, ms: (image.duration ?? 0) / 1000, done: () => image.close(),
+      })),
+      close: () => dec.close(),
+    };
+  };
+  // In script: frames are patches over the previous picture, so they're
+  // painted in order onto a canvas the size of the GIF, honouring "clear this
+  // area afterwards" (disposal 2)
+  const scriptGif = async (src: string): Promise<Gif | null> => {
+    const [{ parseGIF, decompressFrame }, buf] = await Promise.all([
+      import('gifuct-js'),
+      fetch(src).then((r) => r.arrayBuffer()),
+    ]);
+    const gif: any = parseGIF(buf);
+    const frames = gif.frames.filter((f: any) => f.image);
+    if (frames.length < 2) return null;
+    const canvas = document.createElement('canvas');
+    canvas.width = gif.lsd.width; canvas.height = gif.lsd.height;
+    const ctx = canvas.getContext('2d')!;
+    const patch = document.createElement('canvas');
+    const pctx = patch.getContext('2d')!;
+    let clearAfter: { left: number; top: number; width: number; height: number } | null = null;
+    return {
+      count: frames.length, i: 1, next: 0, busy: false,
+      frame: async (i) => {
+        if (i === 0) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        else if (clearAfter) ctx.clearRect(clearAfter.left, clearAfter.top, clearAfter.width, clearAfter.height);
+        const f = decompressFrame(frames[i], gif.gct, true) as any;
+        const { width, height, left, top } = f.dims;
+        patch.width = width; patch.height = height;
+        pctx.putImageData(new ImageData(f.patch, width, height), 0, 0);
+        ctx.drawImage(patch, left, top);
+        clearAfter = f.disposalType === 2 ? f.dims : null;
+        return { source: canvas, ms: f.delay ?? 0, done: () => {} };
+      },
+      close: () => {},
+    };
+  };
   const playGif = async (t: Tex, src: string) => {
     try {
-      const res = await fetch(src);
-      const dec = new Decoder({ data: res.body, type: 'image/gif' });
-      await dec.completed; // the frame count is only known once it's all read
-      const count = dec.tracks.selectedTrack?.frameCount ?? 1;
-      if (count > 1 && !t.dead) t.gif = { dec, count, i: 1, next: 0, busy: false };
-      else dec.close();
+      const native = Decoder && (await Decoder.isTypeSupported?.('image/gif'));
+      const g = await (native ? nativeGif(src) : scriptGif(src));
+      if (g && !t.dead) t.gif = g; else g?.close();
     } catch {}
   };
   const upload = (t: Tex, source: TexImageSource) => {
@@ -238,17 +286,16 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
     const now = performance.now();
     for (const t of tex) {
       const g = t.gif;
-      if (!g || g.busy || now < g.next) continue;
+      if (!g || g.busy || now < g.next || now - (t.seen ?? -1e9) > 500) continue;
       g.busy = true;
-      g.dec.decode({ frameIndex: g.i }).then(({ image }: { image: VideoFrame }) => {
+      g.frame(g.i).then((f) => {
         if (!t.dead) {
-          upload(t, image);
-          // duration is in microseconds; very short delays play at ~10 fps, as browsers do
-          const ms = (image.duration ?? 0) / 1000;
-          g.next = performance.now() + (ms >= 20 ? ms : 100);
+          upload(t, f.source);
+          // very short delays play at ~10 fps, as browsers do
+          g.next = performance.now() + (f.ms >= 20 ? f.ms : 100);
           g.i = (g.i + 1) % g.count;
         }
-        image.close();
+        f.done();
         g.busy = false;
       }).catch(() => { t.gif = undefined; });
     }
@@ -266,7 +313,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       t.aspect = img.naturalWidth / img.naturalHeight;
       t.loaded = 1;
-      if (Decoder && /\.gif(\?|$)/i.test(s.src)) playGif(t, s.src);
+      if (/\.gif(\?|$)/i.test(s.src)) playGif(t, s.src);
     };
     if (s.src) img.src = s.src;
     return t;
@@ -274,7 +321,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   let tex = sources.map(load);
   /** Swap in a different set of card images (the home page's tabs). */
   const setSources = (next: { src: string; tint: string }[]) => {
-    tex.forEach((t) => { t.dead = true; t.gif?.dec.close(); gl.deleteTexture(t.tex); });
+    tex.forEach((t) => { t.dead = true; t.gif?.close(); gl.deleteTexture(t.tex); });
     tex = next.map(load);
   };
 
@@ -321,9 +368,11 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
     gl.uniform1f(cu('uRadius'), 6);
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(cu('uTex'), 0);
+    const drawnAt = performance.now();
     for (const c of cards) {
       const t = tex[c.tex];
       if (!t) continue;
+      t.seen = drawnAt;
       const cardAspect = c.cw / c.ch;
       gl.uniform1f(cu('uFlat'), c.rect ? 1 : 0);
       if (c.rect) gl.uniform4f(cu('uRect'), c.rect[0], c.rect[1], c.rect[2], c.rect[3]);
@@ -370,7 +419,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   const aspectOf = (i: number) => (tex[i]?.loaded ? tex[i].aspect : null);
 
   const destroy = () => {
-    tex.forEach((t) => { t.dead = true; t.gif?.dec.close(); });
+    tex.forEach((t) => { t.dead = true; t.gif?.close(); });
     gl.getExtension('WEBGL_lose_context')?.loseContext();
   };
   return { draw, resize, setSources, aspectOf, destroy };
