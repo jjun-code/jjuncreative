@@ -16,7 +16,7 @@ const cover = src(w.cover, 2400);
 const feature = src(w.inlineImage, 2000);
 const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(next.gallery[0], 1200);
 ---
-<Base title={w.title} description={w.summary} image={cover} footerCta={false}>
+<Base title={w.title} description={w.summary} image={cover} type="article" footerCta={false}>
   <article class="case">
     <header class="grid top">
       <div class="crumbs c-full">

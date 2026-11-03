@@ -7,10 +7,26 @@ import Loader from '../components/Loader.astro';
 import Compose from '../components/Compose.astro';
 import { getSite } from '../lib/content';
 
-interface Props { title?: string; description?: string; image?: string; footer?: boolean; footerCta?: boolean }
+interface Props { title?: string; description?: string; image?: string; type?: 'website' | 'article'; footer?: boolean; footerCta?: boolean }
 const site = await getSite();
-const { title, description = site.description, image, footer = true, footerCta = true } = Astro.props;
-const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
+const { title, description = site.description, image, type = 'website', footer = true, footerCta = true } = Astro.props;
+// The home page says who and where, for search results
+const fullTitle = title ? `${title} — jjuncreative` : `jjuncreative — ${site.role}, ${site.location}`;
+const url = new URL(Astro.url.pathname, Astro.site);
+// Share previews need absolute image URLs; pages without their own image use
+// the wordmark card (public/og.png, 1200×630)
+const ogImage = new URL(image || '/og.png', Astro.site).href;
+// Who the site belongs to, for search engines (home page only)
+const person = Astro.url.pathname === '/' && {
+  '@context': 'https://schema.org',
+  '@type': 'Person',
+  name: 'Junjie Yang',
+  jobTitle: site.role,
+  url: Astro.site?.href,
+  email: `mailto:${site.email}`,
+  address: { '@type': 'PostalAddress', addressLocality: 'Auckland', addressCountry: 'NZ' },
+  sameAs: (site.socials ?? []).map((s: { url: string }) => s.url),
+};
 ---
 <!doctype html>
 <html lang="en">
@@ -34,14 +50,19 @@ const fullTitle = title ? `${title} — jjuncreative` : 'jjuncreative';
     </script>
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
+    <meta property="og:type" content={type} />
+    <meta property="og:site_name" content="jjuncreative" />
+    <meta property="og:url" content={url} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
-    {image && <meta property="og:image" content={image} />}
+    <meta property="og:image" content={ogImage} />
+    {!image && <><meta property="og:image:width" content="1200" /><meta property="og:image:height" content="630" /><meta property="og:image:alt" content="jjuncreative" /></>}
     <meta name="twitter:card" content="summary_large_image" />
-    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
-    <!-- SVG favicon follows the browser's light/dark setting; PNGs cover Safari and home screens -->
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="canonical" href={url} />
+    {person && <script type="application/ld+json" set:html={JSON.stringify(person)} />}
+    <!-- Pixel-art favicon; 48px multiples are what Google shows in results -->
+    <link rel="icon" href="/favicon.ico" sizes="32x32 48x48" />
+    <link rel="icon" href="/favicon-96.png" type="image/png" sizes="96x96" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="preload" href="/fonts/OverusedGrotesk-VF.ttf" as="font" type="font/ttf" crossorigin />
