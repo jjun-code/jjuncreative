@@ -143,7 +143,7 @@ export default config({
         }),
         video: fields.file({
           label: 'Video file',
-          description: 'For Video: an MP4 or WebM, under 20 MB (Cloudflare serves files up to 25 MB). For longer clips, use a YouTube or Vimeo link instead.',
+          description: 'An MP4 or WebM; if there is one, the entry plays it whatever its Type. Keep it under 20 MB (Cloudflare serves files up to 25 MB). For longer clips, use a YouTube or Vimeo link instead.',
           directory: 'public/media/journal',
           publicPath: '/media/journal/',
         }),

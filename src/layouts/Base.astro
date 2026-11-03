@@ -89,6 +89,7 @@ const person = Astro.url.pathname === '/' && {
       import { initBackdrop } from '../scripts/backdrop';
       import { initCoords } from '../scripts/coords';
       import { initTrail } from '../scripts/trail';
+      import { initProtect } from '../scripts/protect';
       import { onPage } from '../scripts/page';
       // These live outside the swapped page content, so they start once
       initSmooth();
@@ -96,6 +97,7 @@ const person = Astro.url.pathname === '/' && {
       initCoords();
       initCursor();
       initTrail();
+      initProtect();
       onPage(initReveal);
 
       // The incoming page arrives without the theme the head script set on
