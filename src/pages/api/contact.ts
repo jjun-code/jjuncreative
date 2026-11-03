@@ -7,7 +7,10 @@ import type { APIRoute } from 'astro';
 export const prerender = false;
 
 const FROM = 'contact@jjuncreative.com';
+// Delivered to the verified inbox (the only kind send_email allows), but
+// addressed to the public address, which forwards to that same inbox
 const TO = 'jjuncreative@gmail.com';
+const SHOWN_TO = 'hello@jjuncreative.com';
 
 const b64 = (s: string) => {
   const bytes = new TextEncoder().encode(s);
@@ -23,7 +26,7 @@ function rawEmail(subject: string, body: string, replyTo: string) {
   const lines = b64(body).match(/.{1,76}/g) ?? [''];
   return [
     `From: ${word('jjuncreative site')} <${FROM}>`,
-    `To: <${TO}>`,
+    `To: <${SHOWN_TO}>`,
     `Reply-To: <${replyTo}>`,
     `Subject: ${word(subject)}`,
     `Date: ${new Date().toUTCString()}`,
