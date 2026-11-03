@@ -489,16 +489,54 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     const setHover = (s: number) => {
       if (s === hovered) return;
       hovered = s;
-      canvas.style.cursor = s >= 0 ? 'pointer' : '';
-      window.dispatchEvent(new CustomEvent('cursor:label', { detail: s >= 0 && data[s % n].href ? 'view' : null }));
+      if (!dragging) canvas.style.cursor = s >= 0 ? 'pointer' : 'grab';
+      window.dispatchEvent(new CustomEvent('cursor:label', { detail: s >= 0 && !dragging && data[s % n].href ? 'view' : null }));
       if (s >= 0) show(s % n); else hide();
     };
+    // ── Mouse drag spins the row (touch has its own handlers above) ──
+    // It follows the pointer, then coasts on from the speed it was let go at;
+    // a press that barely moves is still a click on the card
+    let mDown = false, mLastX = 0, mLastT = 0, mMoved = 0, mVel = 0, dragged = false;
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0 || field.active) return;
+      mDown = true; mMoved = 0; mVel = 0; dragged = false;
+      mLastX = e.clientX; mLastT = performance.now();
+      canvas.setPointerCapture(e.pointerId);
+    });
     canvas.addEventListener('pointermove', (e) => {
       if (e.pointerType !== 'mouse') return;
       mx = e.clientX; my = e.clientY; mouseIn = true;
+      if (!mDown) return;
+      const now = performance.now(), dx = e.clientX - mLastX;
+      mMoved += Math.abs(dx);
+      if (!dragging && mMoved > 5) {
+        dragging = dragged = true; vel = 0;
+        canvas.style.cursor = 'grabbing';
+        window.dispatchEvent(new CustomEvent('cursor:label', { detail: null }));
+      }
+      if (dragging) {
+        theta += dx * radPerPx;
+        mVel = mVel * 0.3 + ((dx * radPerPx * 1000) / Math.max(8, now - mLastT)) * 0.7;
+        spun();
+      }
+      mLastX = e.clientX; mLastT = now;
     });
-    canvas.addEventListener('pointerleave', () => { mouseIn = false; setHover(-1); });
-    canvas.addEventListener('click', () => { if (hovered >= 0 && !field.active) open(hovered); });
+    const mUp = () => {
+      if (!mDown) return;
+      mDown = false;
+      if (!dragging) return;
+      dragging = false;
+      // Held still before letting go: no coast
+      vel = performance.now() - mLastT > 80 ? 0 : Math.max(-step * 18, Math.min(step * 18, mVel));
+      canvas.style.cursor = hovered >= 0 ? 'pointer' : 'grab';
+    };
+    canvas.addEventListener('pointerup', mUp);
+    canvas.addEventListener('pointercancel', mUp);
+    canvas.addEventListener('pointerleave', () => { mouseIn = false; if (!mDown) setHover(-1); });
+    canvas.addEventListener('click', () => {
+      if (dragged) { dragged = false; return; } // the end of a drag, not a click
+      if (hovered >= 0 && !field.active) open(hovered);
+    });
 
     // ── Frame ──
     const frame = (_t: number, dtMs: number) => {
