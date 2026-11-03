@@ -1,6 +1,6 @@
 import { reduced } from './smooth';
 
-/* A short, dithered trail of accent-green pixels behind the mouse. Each move
+/* A short, dithered trail of accent-coloured pixels behind the mouse. Each move
    lights a small patch of grid cells, thinned out by a Bayer matrix (the same
    ordered dither as the background), and the patch dissolves the same way:
    cells drop out in dither order rather than fading as a whole.

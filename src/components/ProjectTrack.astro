@@ -97,7 +97,7 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     </dialog>
 
     <!-- Design / Photography / Experiments: icons, with the label open on the
-         active tab (and on hover); the lime pill slides to the active one -->
+         active tab (and on hover); the accent pill slides to the active one -->
     <!-- Hidden while Design is the only tab with anything in it -->
     <nav class="switch" aria-label="Show" hidden={tabs.length < 2}>
       <span class="switch-hl" aria-hidden="true"></span>
@@ -644,7 +644,7 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     .lb-title { flex-basis: 100%; }
   }
 
-  /* Design / Photography / Experiments, bottom middle; a lime pill slides to the
+  /* Design / Photography / Experiments, bottom middle; an accent pill slides to the
      active tab */
   .switch {
     position: absolute; z-index: 310; left: 50%; bottom: clamp(1.5rem, 4vh, 2.5rem); translate: -50% 0;

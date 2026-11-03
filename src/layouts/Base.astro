@@ -33,7 +33,7 @@ const person = Astro.url.pathname === '/' && {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#141414" />
+    <meta name="theme-color" content="#0b0b0b" />
     <!-- Apply the saved or system theme before first paint, so there's no flash -->
     <script is:inline>
       (() => {
@@ -45,7 +45,7 @@ const person = Astro.url.pathname === '/' && {
         let seen = false;
         try { seen = sessionStorage.getItem('jj-loaded') === '1'; } catch {}
         if (!seen) document.documentElement.classList.add('is-loading');
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'light' ? '#f1f1ef' : '#141414');
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t === 'light' ? '#ffffff' : '#0b0b0b');
       })();
     </script>
     <title>{fullTitle}</title>
@@ -103,7 +103,7 @@ const person = Astro.url.pathname === '/' && {
       document.addEventListener('astro:before-swap', (e) => {
         const theme = document.documentElement.dataset.theme;
         if (theme) e.newDocument.documentElement.dataset.theme = theme;
-        e.newDocument.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#f1f1ef' : '#141414');
+        e.newDocument.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'light' ? '#ffffff' : '#0b0b0b');
       });
     </script>
   </body>

@@ -10,7 +10,7 @@
 }
 
 :root {
-  --bg: #141414;          /* page */
+  --bg: #0b0b0b;          /* page: deep, so text reads clearly */
   --panel: #1f1f1f;       /* cards */
   --panel-2: #2a2a2a;     /* cards inside cards, buttons */
   --hover: #232323;       /* card hover */
@@ -54,23 +54,26 @@
 
 /* Light theme: set by the toggle in the nav, or the visitor's system setting */
 :root[data-theme='light'] {
-  --bg: #f1f1ef;
-  --panel: #ffffff;
-  --panel-2: #e9e9e6;
-  --hover: #fafaf8;
-  --well: #f4f4f2;
-  --line: #0000001a;
-  --line-strong: #00000033;
+  /* White and deep blue, with bubblegum pink as the accent */
+  --bg: #ffffff;
+  --panel: #f3f5fd;
+  --panel-2: #e6eafb;
+  --hover: #eef1fc;
+  --well: #f7f8fe;
+  --line: #0b31bd1f;
+  --line-strong: #0b31bd40;
   --glass: #ffffffe6;
-  --ink: #141414;
-  --body: #3d3d3d;
-  --mute: #707070;
-  --dim: #9d9d9d;
-  --inverse: #141414;
+  --ink: #0b31bd;
+  --body: #22348a;
+  --mute: #5d6fb8;
+  --dim: #93a0d6;
+  --inverse: #0b31bd;
   --inverse-ink: #ffffff;
-  --accent-text: #3f7d00; /* lime is too light to read on a light page */
-  --dither: 20, 20, 20;
-  --grid-line: #00000012;
+  --accent: #fd51cc;
+  --accent-ink: #0b31bd;  /* deep blue reads on the pink; white doesn't */
+  --accent-text: #c8189b; /* pink deep enough to read as text on white */
+  --dither: 11, 49, 189;
+  --grid-line: #0b31bd14;
   color-scheme: light;
 }
 
@@ -126,7 +129,8 @@ button { font: inherit; letter-spacing: inherit; color: inherit; background: non
 @media (hover: none), (pointer: coarse) { .trail { display: none; } }
 
 /* Animated pixel field, fixed behind every page (scripts/pixels.ts) */
-.backdrop { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; opacity: 0.5; pointer-events: none; }
+/* Kept faint so text over it stays easy to read */
+.backdrop { position: fixed; inset: 0; z-index: -1; width: 100%; height: 100%; opacity: 0.18; pointer-events: none; }
 
 /* ── Layout grid ───────────────────────────────
    .site-grid draws the column lines behind every page. Put sections on .grid
@@ -209,6 +213,12 @@ button:hover .roll > span, button:focus-visible .roll > span { transform: transl
 .sweep:hover, .sweep:focus-visible { background-size: 100% 1px; }
 
 /* Pill tag */
+/* Solid chip for a fact's value (project facts, About stats): inverted, with
+   half the cards' rounding so it looks as square as the big frames */
+.chip {
+  display: inline-flex; align-items: center; padding: 0.35rem 0.7rem; border-radius: calc(var(--radius) / 2);
+  background: var(--ink); color: var(--bg); font-size: var(--step--1); line-height: 1.2;
+}
 .tag { display: inline-block; font-size: var(--step--1); border: 1px solid var(--line); border-radius: 99px; padding: 0.25rem 0.75rem; color: var(--mute); }
 
 /* Reveal on scroll (driven by scripts/reveal.ts) */

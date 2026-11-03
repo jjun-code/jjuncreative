@@ -6,15 +6,18 @@ export async function getStaticPaths() {
   const work = await getWork();
   return work.map((w, i) => ({
     params: { slug: w.slug },
-    props: { w, i, total: work.length, next: work[(i + 1) % work.length] },
+    props: { w, i, total: work.length, prev: work[(i - 1 + work.length) % work.length], next: work[(i + 1) % work.length] },
   }));
 }
 
-const { w, i, total, next } = Astro.props;
+const { w, i, total, prev, next } = Astro.props;
 const html = await renderBody(w.body);
 const cover = src(w.cover, 2400);
 const feature = src(w.inlineImage, 2000);
-const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(next.gallery[0], 1200);
+const thumb = (p: any) => src(p.cover, 1200) || src(p.inlineImage, 1200) || src(p.gallery[0], 1200);
+// The projects either side, wrapping round (just one when there are only two)
+const others = [...new Map([[prev.slug, { p: prev, dir: 'prev' }], [next.slug, { p: next, dir: 'next' }]]).values()]
+  .filter(({ p }) => p.slug !== w.slug);
 ---
 <Base title={w.title} description={w.summary} image={cover} type="article" footerCta={false}>
   <article class="case">
@@ -37,9 +40,10 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
       <h1 class="h1 title c-full">{w.title}</h1>
       <p class="summary h3 c-1">{w.summary}</p>
       <dl class="facts c-3 sub">
-        <div><dt class="label">Year</dt><dd>{w.year}</dd></div>
-        <div><dt class="label">Category</dt><dd>{w.category}</dd></div>
-        <div><dt class="label">Tools</dt><dd>{w.tools.join(', ')}</dd></div>
+        <!-- Each value is a solid chip (one per tool) -->
+        <div><dt class="label">Year</dt><dd><span class="chip">{w.year}</span></dd></div>
+        <div><dt class="label">Category</dt><dd><span class="chip">{w.category}</span></dd></div>
+        <div><dt class="label">Tools</dt><dd>{w.tools.map((t: string) => <span class="chip">{t}</span>)}</dd></div>
       </dl>
     </header>
 
@@ -67,26 +71,96 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
       </section>
     )}
 
-    <section class="grid">
-      <a href={`/work/${next.slug}/`} class="next card c-full" data-cursor="next">
-        <div class="next-copy">
-          <p class="label">Next project</p>
-          <span class="h1">{next.title}</span>
-          <span class="next-meta">{next.year}, {next.category}</span>
-        </div>
-        {nextThumb && <div class="next-img"><img src={nextThumb} alt="" loading="lazy" /></div>}
-      </a>
-    </section>
+    <!-- The projects either side, as square cards like the About toolkit:
+         the image in black and white, flooding into colour in a dithered
+         wave from where the pointer comes in (script below) -->
+    <nav class="more grid" aria-label="More projects">
+      {others.map(({ p, dir }) => (
+        <a href={`/work/${p.slug}/`} class:list={['more-card', dir]} data-cursor="view" rel={dir}>
+          {thumb(p) && <img class="mono-img" src={thumb(p)} alt="" loading="lazy" />}
+          <canvas class="flood" aria-hidden="true"></canvas>
+          <span class="arrow mono" aria-hidden="true">{dir === 'prev' ? '←' : '→'}</span>
+          <span class="more-meta">
+            <strong>{p.title}</strong>
+            <span class="mono">{p.category}</span>
+          </span>
+        </a>
+      ))}
+    </nav>
   </article>
 </Base>
 
 <script>
   import { gsap, reduced } from '../../scripts/smooth';
   import { onPage, previousPath } from '../../scripts/page';
+
+  // More-project cards: the colour image floods in over the black-and-white one
+  // in a dithered wave from where the pointer came in, and drains toward where
+  // it left (the same feel as the About toolkit)
+  const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+  const CELL = 6; // px per flood pixel
+  function initMore() {
+    const rm = reduced();
+    document.querySelectorAll<HTMLElement>('.more-card').forEach((card) => {
+      const canvas = card.querySelector<HTMLCanvasElement>('.flood')!;
+      const img = card.querySelector<HTMLImageElement>('.mono-img');
+      if (!img) return;
+      const ctx = canvas.getContext('2d')!;
+      // Low-res mask of which cells are lit
+      const mask = document.createElement('canvas');
+      const mctx = mask.getContext('2d')!;
+      let W = 0, H = 0, cw = 0, ch = 0, t = 0, target = 0, ox = 0, oy = 0, raf = 0;
+      const size = () => {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        W = canvas.width = Math.round(card.clientWidth * dpr); H = canvas.height = Math.round(card.clientHeight * dpr);
+        cw = mask.width = Math.ceil(card.clientWidth / CELL); ch = mask.height = Math.ceil(card.clientHeight / CELL);
+      };
+      const draw = () => {
+        ctx.clearRect(0, 0, W, H);
+        if (t <= 0 || !img.complete || !img.naturalWidth) return;
+        mctx.clearRect(0, 0, cw, ch);
+        mctx.fillStyle = '#000';
+        const far = Math.max(Math.hypot(ox, oy), Math.hypot(cw - ox, oy), Math.hypot(ox, ch - oy), Math.hypot(cw - ox, ch - oy));
+        for (let y = 0; y < ch; y++) {
+          for (let x = 0; x < cw; x++) {
+            const th = (Math.hypot(x - ox, y - oy) / far) * 0.65 + BAYER[(y & 3) * 4 + (x & 3)] * 0.35;
+            if (th < t) mctx.fillRect(x, y, 1, 1);
+          }
+        }
+        // The image, cropped to cover the card, then cut to the lit cells
+        const s = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+        const iw = img.naturalWidth * s, ih = img.naturalHeight * s;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.drawImage(img, (W - iw) / 2, (H - ih) / 2, iw, ih);
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(mask, 0, 0, cw * CELL * (W / card.clientWidth), ch * CELL * (H / card.clientHeight));
+        ctx.globalCompositeOperation = 'source-over';
+      };
+      const loop = () => {
+        t += (target - t) * (rm ? 1 : 0.16);
+        if (Math.abs(target - t) < 0.004) t = target;
+        card.classList.toggle('lit', t > 0.55);
+        draw();
+        raf = t !== target ? requestAnimationFrame(loop) : 0;
+      };
+      const go = (to: number, e: PointerEvent) => {
+        const r = card.getBoundingClientRect();
+        ox = (e.clientX - r.left) / CELL; oy = (e.clientY - r.top) / CELL;
+        target = to;
+        if (!raf) raf = requestAnimationFrame(loop);
+      };
+      size();
+      new ResizeObserver(() => { size(); draw(); }).observe(card);
+      card.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') go(1.05, e); });
+      card.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') go(0, e); });
+    });
+  }
   onPage(() => {
     document.querySelector('[data-close]')?.addEventListener('click', (e) => {
       if (previousPath() === '/' && (history.state?.index ?? 0) > 0) { e.preventDefault(); history.back(); }
     });
+    initMore();
     if (!reduced()) {
       gsap.from('.title', { yPercent: 40, opacity: 0, duration: 1.1, ease: 'expo.out' });
       gsap.from('.facts > div', { y: 20, opacity: 0, duration: 0.9, ease: 'expo.out', stagger: 0.07, delay: 0.2 });
@@ -108,8 +182,8 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
   /* Facts sit one per column, each under a rule that starts on its grid line */
   .facts { margin: 0; }
   .facts > div { border-top: 1px solid var(--line); padding-top: 0.8rem; }
-  .facts .label { margin-bottom: 0.4rem; }
-  .facts dd { margin: 0; }
+  .facts .label { margin-bottom: 0.6rem; }
+  .facts dd { margin: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
 
   .frame { overflow: hidden; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); padding: 0; }
   .frame img { width: 100%; }
@@ -138,24 +212,36 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
   .gallery figure { margin: 0; }
   .gallery figcaption { font-size: var(--step--1); color: var(--mute); padding-top: 0.7rem; }
 
-  .next {
-    display: grid; grid-template-columns: 1fr minmax(0, 0.9fr); gap: 2rem; align-items: center;
-    padding: clamp(1.4rem, 3vw, 2.4rem); overflow: hidden;
-    transition: border-color 0.4s, background-color 0.4s;
+  /* More projects: square cards at the outer columns (previous first, next last) */
+  .more { padding-block: clamp(4rem, 9vw, 8rem) clamp(3rem, 6vw, 5rem); }
+  .more-card {
+    position: relative; isolation: isolate; overflow: hidden; aspect-ratio: 1;
+    display: grid; grid-template-rows: auto 1fr auto; padding: 1rem;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    color: #fff; transition: border-color 0.35s;
   }
-  .next:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
-  .next .h1 { display: block; overflow-wrap: anywhere; transition: color 0.4s; }
-  .next:hover .h1 { color: var(--accent-text); }
-  .next-meta { display: block; margin-top: 1rem; color: var(--mute); font-size: var(--step--1); }
-  .next-img { border-radius: 6px; overflow: hidden; aspect-ratio: 16 / 10; }
-  .next-img img { width: 100%; height: 100%; object-fit: cover; transition: scale 0.8s var(--ease); }
-  .next:hover .next-img img { scale: 1.05; }
+  .more-card.prev { grid-column: 1; }
+  .more-card.next { grid-column: -2; }
+  /* Black and white, dimmed so the text reads; a shade at top and bottom too */
+  .mono-img, .flood { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; }
+  .mono-img { filter: grayscale(1) brightness(0.55); }
+  .flood { z-index: -1; }
+  .more-card::after {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background: linear-gradient(#0008, transparent 30%, transparent 60%, #000a);
+  }
+  .arrow, .more-meta { position: relative; z-index: 1; }
+  .arrow { color: #fffa; }
+  .next .arrow { justify-self: end; }
+  .more-meta { grid-row: 3; display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+  .more-meta strong { font-weight: 500; }
+  .more-meta .mono { color: #fffb; font-size: var(--step--2); }
+  .more-card.lit { border-color: transparent; }
 
   @media (max-width: 760px) {
     .summary { grid-column: 1 / -1; margin-bottom: 1.5rem; }
     .facts { grid-column: 1 / -1; row-gap: 1rem; }
     .facts > div:last-child { grid-column: 1 / -1; }
     .ps > div, .gallery figure { grid-column: 1 / -1; }
-    .next { grid-template-columns: 1fr; }
   }
 </style>
