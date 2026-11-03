@@ -8,3 +8,11 @@ export function onPage(setup: () => void | (() => void)) {
     if (cleanup) document.addEventListener('astro:before-swap', cleanup, { once: true });
   });
 }
+
+// The page the visitor was on before this one, within this visit (null after a
+// full page load)
+let prev: string | null = null;
+document.addEventListener('astro:before-preparation', (e) => {
+  prev = (e as unknown as { from: URL }).from.pathname;
+});
+export const previousPath = () => prev;

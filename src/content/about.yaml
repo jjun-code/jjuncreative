@@ -45,7 +45,7 @@ toolkit:
   - name: Notion
     use: productivity
   - name: Claude
-    use: vibe coding
+    use: building
   - name: Adobe Suite
     use: visual design
   - name: Steam

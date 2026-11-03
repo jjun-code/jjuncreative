@@ -1,7 +1,7 @@
 /* WebGL renderer for the home page project row. Cards are curved planes on a
    large cylinder seen from outside, drawn into an offscreen buffer; a second
-   pass adds a lens-like chromatic aberration and horizontal smear that grow
-   toward the screen edges (and with scroll speed). The DOM keeps the labels,
+   Gaussian blur, run across then down, adds a lens-like chromatic aberration
+   and a soft blur that grow toward the screen edges (and with scroll speed). The DOM keeps the labels,
    details panel and links; this only draws pixels. */
 
 export type View = {
@@ -68,40 +68,41 @@ const POST_FS = `#version 300 es
 precision highp float;
 in vec2 vUv;
 uniform sampler2D uScene;
-uniform vec2 uRes;
-uniform float uCA, uVel;
+uniform vec2 uRes, uDir; // uDir: (1, 0) across, (0, 1) down
+uniform float uCA, uVel, uSplit; // uSplit: 1 on the pass that also splits colour
 out vec4 o;
-const int N = 16;
 void main() {
   float dx = vUv.x - 0.5;
   // 0 across the middle, easing in toward the left and right edges
-  float e = smoothstep(0.22, 0.5, abs(dx));
+  float e = smoothstep(0.2, 0.5, abs(dx));
   e *= e;
   // Turning fast adds to it, mostly at the sides so the middle stays readable
   float v = uVel * (0.25 + 0.75 * e);
-  float k = e * uCA + v; // colour spread, in uv
-  float blurPx = e * 12.0 + v * 500.0; // soft blur radius, in px
+  float reach = e * 18.0 + v * 600.0; // blur reach in px (about 3 sigma)
+  float k = (e * uCA + v * 0.4) * uSplit; // colour split, in uv (gentle; the blur does most of the work)
   // The middle stays sharp (and cheap)
-  if (k < 0.0002 && blurPx < 0.3) { o = texture(uScene, vUv); return; }
-  vec2 dir = vec2(sign(dx) * k, 0.0);
-  vec2 blur = vec2(blurPx / uRes.x, blurPx * 0.4 / uRes.y);
-  // Samples spread along the split, each tinted by where it falls on a
-  // red → green → blue spectrum, so the fringe is a smooth gradient rather than
-  // three hard copies; they also scatter over a small disc for the blur
-  vec3 rgb = vec3(0.0), alpha = vec3(0.0), wsum = vec3(0.0);
-  for (int i = 0; i < N; i++) {
-    float t = (float(i) + 0.5) / float(N);
-    vec3 w = max(vec3(0.0), 1.0 - abs(vec3(t) - vec3(0.15, 0.5, 0.85)) / vec3(0.45, 0.38, 0.45));
-    float ang = float(i) * 2.39996; // golden angle
-    vec2 disc = vec2(cos(ang), sin(ang)) * sqrt(t) * blur;
-    vec4 s = texture(uScene, vUv + dir * (t - 0.5) * 2.0 + disc);
-    rgb += s.rgb * w;
-    alpha += s.a * w;
+  if (reach < 0.5 && k < 0.0002) { o = texture(uScene, vUv); return; }
+  vec2 stepUv = uDir * (reach / 6.0) / uRes;
+  vec2 off = vec2(sign(dx) * k, 0.0);
+  // 13 taps with Gaussian weights (sigma = 2 taps). On the colour pass each tap
+  // reads red, green and blue from slightly different places; the blur then
+  // smears those apart into a soft gradient rather than hard copies
+  vec4 acc = vec4(0.0);
+  float wsum = 0.0;
+  for (int i = -6; i <= 6; i++) {
+    float w = exp(-float(i * i) / 8.0);
+    vec2 uv = vUv + stepUv * float(i);
+    vec4 c;
+    if (uSplit > 0.5) {
+      vec4 r = texture(uScene, uv - off), g = texture(uScene, uv), bl = texture(uScene, uv + off);
+      c = vec4(r.r, g.g, bl.b, max(max(r.a, g.a), bl.a)); // still premultiplied
+    } else {
+      c = texture(uScene, uv);
+    }
+    acc += c * w;
     wsum += w;
   }
-  rgb /= wsum;
-  alpha /= wsum;
-  o = vec4(rgb, max(max(alpha.r, alpha.g), alpha.b)); // still premultiplied
+  o = acc / wsum;
 }`;
 
 function program(gl: WebGL2RenderingContext, vs: string, fs: string) {
@@ -174,21 +175,24 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   });
 
   // Offscreen buffer the cards are drawn into before the lens pass
-  const fbo = gl.createFramebuffer()!;
-  const sceneTex = gl.createTexture()!;
+  // Offscreen buffers: the cards are drawn into the first, blurred across
+  // (with the colour split) into the second, then blurred down onto the screen
+  const targets = [0, 1].map(() => ({ fbo: gl.createFramebuffer()!, tex: gl.createTexture()! }));
   let w = 0, h = 0;
   const resize = () => {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     w = Math.round(canvas.clientWidth * dpr); h = Math.round(canvas.clientHeight * dpr);
     canvas.width = w; canvas.height = h;
-    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, sceneTex, 0);
+    for (const t of targets) {
+      gl.bindTexture(gl.TEXTURE_2D, t.tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t.tex, 0);
+    }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   };
   resize();
@@ -196,7 +200,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   /** Cards must come back to front. vel: scroll speed, adds to the effect. */
   const draw = (v: View, cards: CardDraw[], vel: number) => {
     gl.viewport(0, 0, w, h);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, targets[0].fbo);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND);
@@ -226,16 +230,26 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
       gl.uniform1f(cu('uArc'), c.arc);
       gl.drawElements(gl.TRIANGLES, SEG * 6, gl.UNSIGNED_SHORT, 0);
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.disable(gl.BLEND);
-    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(post);
     gl.bindVertexArray(empty);
-    gl.bindTexture(gl.TEXTURE_2D, sceneTex);
     gl.uniform1i(pu('uScene'), 0);
     gl.uniform2f(pu('uRes'), w, h);
-    gl.uniform1f(pu('uCA'), 0.016);
+    gl.uniform1f(pu('uCA'), 0.006); // colour split at the very edge, in uv
     gl.uniform1f(pu('uVel'), vel);
+    // Across, with the colour split, into the second buffer…
+    gl.bindFramebuffer(gl.FRAMEBUFFER, targets[1].fbo);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindTexture(gl.TEXTURE_2D, targets[0].tex);
+    gl.uniform2f(pu('uDir'), 1, 0);
+    gl.uniform1f(pu('uSplit'), 1);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // …then down, onto the screen
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.bindTexture(gl.TEXTURE_2D, targets[1].tex);
+    gl.uniform2f(pu('uDir'), 0, 1);
+    gl.uniform1f(pu('uSplit'), 0);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
 

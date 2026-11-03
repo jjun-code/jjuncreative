@@ -20,9 +20,9 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
   <article class="case">
     <header class="grid top">
       <div class="crumbs c-full">
-        <!-- Back to wherever the visitor came from (keeping their place on the
-             home page); straight to home if they landed here directly -->
-        <a href="/" class="tag" data-back>← Back</a>
+        <!-- Always back to the home page (stepping back in history when that's
+             where the visitor came from, so their place in the row is kept) -->
+        <a href="/" class="tag" data-close>✕ Close</a>
         <span class="num">{String(i + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
       </div>
     </header>
@@ -82,10 +82,10 @@ const nextThumb = src(next.cover, 1200) || src(next.inlineImage, 1200) || src(ne
 
 <script>
   import { gsap, reduced } from '../../scripts/smooth';
-  import { onPage } from '../../scripts/page';
+  import { onPage, previousPath } from '../../scripts/page';
   onPage(() => {
-    document.querySelector('[data-back]')?.addEventListener('click', (e) => {
-      if ((history.state?.index ?? 0) > 0) { e.preventDefault(); history.back(); }
+    document.querySelector('[data-close]')?.addEventListener('click', (e) => {
+      if (previousPath() === '/' && (history.state?.index ?? 0) > 0) { e.preventDefault(); history.back(); }
     });
     if (!reduced()) {
       gsap.from('.title', { yPercent: 40, opacity: 0, duration: 1.1, ease: 'expo.out' });
