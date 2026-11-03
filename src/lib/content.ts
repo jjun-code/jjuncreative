@@ -26,9 +26,9 @@ export async function getWork() {
     .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (b.year ?? 0) - (a.year ?? 0));
 }
 
-/** Photography or Experiments entries, in the same order rules as Work. */
-export async function getCollection(name: 'photography' | 'experiments') {
-  const entries = await reader.collections[name].all();
+/** Visual journal entries, in the same order rules as Work. */
+export async function getJournal() {
+  const entries = await reader.collections.journal.all();
   return entries
     .map(({ slug, entry }) => ({ slug, ...entry }))
     .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (b.year ?? 0) - (a.year ?? 0));

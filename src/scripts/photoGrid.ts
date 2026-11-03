@@ -9,7 +9,9 @@
 import { lensScreen, lensSource, type CardDraw } from './gallery';
 
 type Gallery = { draw: (...a: any[]) => void; aspectOf: (i: number) => number | null };
-type Item = { title: string };
+type Item = { title: string; kind?: string; more?: unknown[] };
+// Videos and links are marked before their title
+const mark: Record<string, string> = { video: '▶ ', link: '↗ ' };
 
 export function createPhotoField(opts: {
   canvas: HTMLCanvasElement;
@@ -17,6 +19,7 @@ export function createPhotoField(opts: {
   gallery: Gallery;
   onHover: (i: number) => void; // photo index, or -1
   onOpen: (i: number) => void;
+  reduced?: boolean; // skip the entrance
 }) {
   const { canvas, labels, gallery } = opts;
   let items: Item[] = [];
@@ -73,6 +76,36 @@ export function createPhotoField(opts: {
     return -1;
   };
 
+  // ── Entrance: photos bloom out from the middle of the screen ──
+  // Each one grows from a point at its own centre, later the further it is
+  // from the middle, while the field glides up into place; titles fade in
+  // behind them. grow() is 0 → 1 for a photo whose centre is at (x, y).
+  let introAt = -1;
+  // The entrance waits for every cover to load (so nothing pops in or changes
+  // shape mid-way), or 3 s, whichever comes first; until then nothing shows
+  let waitingSince = -1;
+  const coversReady = () => {
+    for (let i = 0; i < n; i++) if (gallery.aspectOf(i) === null) return false;
+    return true;
+  };
+  const INTRO = 1.6; // seconds until the furthest photo has landed
+  const easeOut = (t: number) => 1 - Math.pow(1 - t, 4);
+  const grow = (x: number, y: number) => {
+    if (introAt < 0) return 1;
+    const t = (performance.now() - introAt) / 1000;
+    if (t > INTRO) { introAt = -1; return 1; }
+    const d = Math.min(1, Math.hypot(x - W / 2, y - H / 2) / Math.hypot(W / 2, H / 2));
+    return easeOut(Math.min(1, Math.max(0, (t - 0.05 - d * 0.55) / 0.9)));
+  };
+  const start = () => {
+    waitingSince = -1;
+    if (opts.reduced) return;
+    introAt = performance.now();
+    // Start a little below and glide up into place
+    oy += pitchY * 0.35; vy = -pitchY * 0.35 * 4; vx = 0;
+  };
+  const intro = () => { introAt = -1; waitingSince = performance.now(); };
+
   // ── Titles: a pool of spans placed over the photos each frame ──
   const pool: HTMLSpanElement[] = [];
   const placeLabels = (cells: ReturnType<typeof box>[]) => {
@@ -85,8 +118,13 @@ export function createPhotoField(opts: {
       const s = Math.max(1, (x2 - x) / 10);
       let el = pool[k];
       if (!el) { el = pool[k] = document.createElement('span'); labels.append(el); }
-      if (el.textContent !== items[b.i].title) el.textContent = items[b.i].title;
+      const it = items[b.i], series = it.more?.length ? ` (${it.more.length + 1})` : '';
+      const text = (mark[it.kind ?? ''] ?? '') + it.title + series;
+      if (el.textContent !== text) el.textContent = text;
       el.style.transform = `translate(${x + 6 * s}px, ${y}px) rotate(90deg) scale(${s}) translateY(-100%)`;
+      // During the entrance a title follows its photo in
+      const g = grow(b.x + b.w / 2 - ox, b.y + b.h / 2 - oy);
+      el.style.opacity = g < 1 ? String(Math.max(0, g * 1.4 - 0.4)) : '';
       el.hidden = false;
       k++;
     }
@@ -168,9 +206,21 @@ export function createPhotoField(opts: {
       if (Math.hypot(vx, vy) < 1) vx = vy = 0;
     }
     const cells = n ? visible() : [];
-    const cards: CardDraw[] = cells.map((b) => ({
-      tex: b.i, angle: 0, arc: 0, cw: b.w, ch: b.h, rect: [b.x - ox, b.y - oy, b.w, b.h],
-    }));
+    // Hold the entrance until the covers are in
+    if (waitingSince >= 0) {
+      if (coversReady() || performance.now() - waitingSince > 3000) start();
+      else { gallery.draw(view, [], 0, true); labels.style.opacity = '0'; return; }
+    }
+    labels.style.opacity = '';
+    const cards: CardDraw[] = [];
+    for (const b of cells) {
+      const x = b.x - ox, y = b.y - oy;
+      const g = grow(x + b.w / 2, y + b.h / 2);
+      if (g <= 0.01) continue;
+      // Grow about its centre, rising a touch as it lands
+      const w = b.w * g, h = b.h * g;
+      cards.push({ tex: b.i, angle: 0, arc: 0, cw: w, ch: h, rect: [x + (b.w - w) / 2, y + (b.h - h) / 2 + (1 - g) * 24, w, h] });
+    }
     // Moving fast strengthens the fringe a little
     gallery.draw(view, cards, Math.min(0.01, Math.hypot(vx, vy) * 0.000004), true);
     placeLabels(cells);
@@ -190,7 +240,10 @@ export function createPhotoField(opts: {
       active = true; measure(); centre();
       labels.hidden = false;
       canvas.style.cursor = 'grab';
+      intro();
     },
+    /** Play the entrance again (e.g. once the site loader has lifted). */
+    intro: () => { if (active) { centre(); intro(); } },
     deactivate() {
       active = false; dragging = false;
       setHover(-1);

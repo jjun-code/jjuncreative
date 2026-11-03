@@ -5,16 +5,17 @@
 // which adds a lens-like colour fringe and smear toward the screen edges.
 // Scrolling, swiping or the arrow keys turn the row; hovering a card shows its
 // details (on touch screens, the card at the front shows them). Items repeat
-// to fill the ring. A toggle at the bottom switches between Design (the work), Photography
-// and Experiments; an empty tab says "Coming soon". Photography is laid out
-// differently: an endless field of photos to drag around (scripts/photoGrid.ts),
-// and clicking one opens it full screen.
+// to fill the ring. A toggle at the bottom switches between Design (the work)
+// and the Visual journal, which is laid out differently: an endless field of
+// images to drag around (scripts/photoGrid.ts); clicking one opens it full
+// screen, where it plays if it's a video and links out if it's a link.
 import { src } from '../lib/content';
-const { work, photography, experiments } = Astro.props;
+const { work, journal } = Astro.props;
+const kinds: Record<string, string> = { photo: 'Photography', image: 'Image', video: 'Video', link: 'Link' };
 const img = (i: any) => (typeof i === 'string' ? i : src(i, 1200)) || '';
 const sets = [
   {
-    key: 'work', label: 'Design',
+    key: 'work', label: 'Design Work',
     items: work.map((w: any) => ({
       title: w.title, img: img(w.cover) || img(w.inlineImage) || img(w.gallery[0]), tint: w.charm.color,
       href: `/work/${w.slug}/`, slug: w.slug, facts: [['Category', w.category], ['Year', w.year]], tools: w.tools,
@@ -22,33 +23,28 @@ const sets = [
     })),
   },
   {
-    key: 'photography', label: 'Photography',
-    items: photography.map((p: any) => ({
-      title: p.title, img: img(p.image), tint: p.color || '#2a2a2a', href: p.link || '', slug: p.slug,
-      facts: [['Location', p.location], ['Year', p.year]], tools: [], summary: p.description, cta: 'Open',
-      meta: [p.location, p.year].filter(Boolean).join(' · '),
-    })),
-  },
-  {
-    key: 'experiments', label: 'Experiments',
-    items: experiments.map((x: any) => ({
-      title: x.title, img: img(x.image), tint: x.color || '#2a2a2a', href: x.link || '', slug: x.slug,
-      facts: [['Type', x.category], ['Year', x.year]], tools: x.tools ?? [], summary: x.description, cta: 'Open',
+    key: 'journal', label: 'Visual journal',
+    items: journal.map((j: any) => ({
+      title: j.title, img: img(j.image), tint: j.color || '#2a2a2a', href: j.link || '', slug: j.slug,
+      facts: [['Type', kinds[j.kind]], ['Source', j.source], ['Year', j.year]], tools: [], summary: j.description, cta: 'Visit',
+      meta: [j.source, j.year].filter(Boolean).join(' · '),
+      kind: j.kind || 'image', video: j.video || '',
+      // A series: the extra images after the main one
+      more: (j.more ?? []).filter((m: any) => m.image).map((m: any) => ({ img: m.image, caption: m.caption || '' })),
     })),
   },
 ];
-// Tab icons, 20×20 line drawings: pen nib, camera, flask
+// Tab icons, 20×20 line drawings: pen nib, sparkle
 const icons: Record<string, string> = {
   work: '<path d="M10 3 15.5 9 12 17H8L4.5 9Z"/><path d="M10 3v6.5"/><circle cx="10" cy="11" r="1.3"/><path d="M8 17h4"/>',
-  photography: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h2l1.3-2h4.4l1.3 2h2A1.5 1.5 0 0 1 17 7.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5Z"/><circle cx="10" cy="10.5" r="3"/>',
-  experiments: '<path d="M8 3h4M8.5 3v4.5L4 15a1.3 1.3 0 0 0 1.1 2h9.8A1.3 1.3 0 0 0 16 15l-4.5-7.5V3M6 12.5h8"/>',
+  journal: '<path d="M10 2.5c.6 3.9 3.6 6.9 7.5 7.5-3.9.6-6.9 3.6-7.5 7.5-.6-3.9-3.6-6.9-7.5-7.5 3.9-.6 6.9-3.6 7.5-7.5Z"/>',
 };
 // Tabs with nothing in them yet are left out (Design always shows)
 const tabs = sets.filter((s) => s.key === 'work' || s.items.length);
 // The client only needs what it draws and links to
-const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, img, tint, href, slug, meta }: any) => ({ title, img, tint, href, slug, meta })) }));
+const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, img, tint, href, slug, meta, kind, video, more }: any) => ({ title, img, tint, href, slug, meta, kind, video, more })) }));
 ---
-<section class="projects" id="work" aria-label="Work, photography and experiments" data-sets={JSON.stringify(clientSets)}>
+<section class="projects" id="work" aria-label="Work and visual journal" data-sets={JSON.stringify(clientSets)}>
   <div class="stage">
     <div class="details" aria-live="polite">
       {sets.map((set) => set.items.map((it: any, i: number) => (
@@ -71,27 +67,30 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     </div>
 
     <canvas class="gl" aria-hidden="true"></canvas>
-    <!-- Photo titles in the photography field, placed by script -->
+    <!-- Titles in the journal field, placed by script -->
     <div class="field-labels mono" aria-hidden="true" hidden></div>
     <p class="empty mono" hidden>Coming soon</p>
 
-    <!-- A photo, full screen -->
-    <dialog class="lightbox" aria-label="Photo" tabindex="-1">
-      <img alt="" />
+    <!-- A journal item, full screen: an image or GIF, a video, or an embedded
+         YouTube / Vimeo player (filled in by script); other links get Visit -->
+    <dialog class="lightbox" aria-label="Journal item" tabindex="-1">
+      <div class="lb-media"></div>
       <div class="lb-bar">
         <p class="lb-title"></p>
         <p class="lb-meta mono"></p>
-        <p class="lb-count mono"></p>
+        <!-- Where you are in a series, e.g. 2 / 6 -->
+        <p class="lb-sub mono" hidden></p>
+        <a class="lb-visit mono" target="_blank" rel="noopener" hidden>Visit <span aria-hidden="true">↗</span></a>
       </div>
       <!-- Round glass buttons like the nav's; Close opens its label on hover -->
       <button type="button" class="lb-btn lb-close" aria-label="Close">
         <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="m5.5 5.5 9 9M14.5 5.5l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none" /></svg></span>
         <span class="lbl" aria-hidden="true"><span><span>Close</span></span></span>
       </button>
-      <button type="button" class="lb-btn lb-prev" aria-label="Previous photo">
+      <button type="button" class="lb-btn lb-prev" aria-label="Previous">
         <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M16 10H4.5M9 5l-5 5 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" /></svg></span>
       </button>
-      <button type="button" class="lb-btn lb-next" aria-label="Next photo">
+      <button type="button" class="lb-btn lb-next" aria-label="Next">
         <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M4 10h11.5M11 5l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none" /></svg></span>
       </button>
     </dialog>
@@ -127,7 +126,7 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
   import { createPhotoField } from '../scripts/photoGrid';
   import { navigate } from 'astro:transitions/client';
 
-  type Item = { title: string; img: string; tint: string; href: string; slug: string; meta?: string };
+  type Item = { title: string; img: string; tint: string; href: string; slug: string; meta?: string; kind?: string; video?: string; more?: { img: string; caption: string }[] };
   type Set = { key: string; items: Item[] };
 
   // ── Geometry (pure, so it can also place a card before the page starts) ──
@@ -243,19 +242,59 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     const { signal } = ac;
     const rm = reduced();
 
-    // ── Photography: the photo field, and a photo full screen ──
+    // ── Visual journal: the field, and an item full screen ──
     const box = sec.querySelector<HTMLDialogElement>('.lightbox')!;
-    const boxImg = box.querySelector('img')!;
+    const media = box.querySelector<HTMLElement>('.lb-media')!;
+    const visit = box.querySelector<HTMLAnchorElement>('.lb-visit')!;
     let boxAt = 0;
-    const showPhoto = (i: number, dir = 0) => {
+    // A YouTube or Vimeo link → its embeddable player (null for other links)
+    const embedOf = (url: string) => {
+      try {
+        const u = new URL(url);
+        const yt = u.hostname.includes('youtu.be') ? u.pathname.slice(1)
+          : u.hostname.includes('youtube.com') ? (u.searchParams.get('v') || u.pathname.split('/').pop()) : '';
+        if (yt) return `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&rel=0`;
+        const vm = u.hostname.includes('vimeo.com') && u.pathname.match(/\d+/)?.[0];
+        if (vm) return `https://player.vimeo.com/video/${vm}?autoplay=1`;
+      } catch {}
+      return null;
+    };
+    const make = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]>) =>
+      Object.assign(document.createElement(tag), props);
+    // sub: which image of a series (0 is the entry's main image or video)
+    let sub = 0;
+    const lengthOf = (i: number) => 1 + (data[(i + n) % n].more?.length ?? 0);
+    const showPhoto = (i: number, dir = 0, at = 0) => {
       boxAt = (i + n) % n;
+      sub = at;
       const it = data[boxAt];
-      boxImg.src = it.img;
-      boxImg.alt = it.title;
+      const count = lengthOf(boxAt);
+      const extra = sub > 0 ? it.more![sub - 1] : null;
+      // Only videos and links play in an embedded player
+      const embed = (it.kind === 'video' || it.kind === 'link') && it.href ? embedOf(it.href) : null;
+      let m: HTMLElement;
+      if (extra) {
+        m = make('img', { src: extra.img, alt: extra.caption || it.title });
+      } else if (it.kind === 'video' && it.video) {
+        m = make('video', { src: it.video, poster: it.img, controls: true, autoplay: true, muted: true, loop: true, playsInline: true });
+      } else if (embed) {
+        m = make('iframe', { src: embed, title: it.title, allow: 'autoplay; fullscreen; picture-in-picture', allowFullscreen: true, className: 'embed' });
+      } else {
+        m = make('img', { src: it.img, alt: it.title });
+      }
+      media.replaceChildren(m);
+      // Other links (and a link on an image) get a Visit button
+      visit.hidden = !it.href || !!embed;
+      if (it.href) visit.href = it.href;
       box.querySelector('.lb-title')!.textContent = it.title;
-      box.querySelector('.lb-meta')!.textContent = it.meta ?? '';
-      box.querySelector('.lb-count')!.textContent = `${String(boxAt + 1).padStart(2, '0')} / ${String(n).padStart(2, '0')}`;
-      if (!rm) gsap.fromTo(boxImg, { opacity: 0, x: dir * 40, scale: dir ? 1 : 0.96 }, { opacity: 1, x: 0, scale: 1, duration: 0.6, ease: 'expo.out' });
+      // A series image's caption replaces the source line while it's showing
+      box.querySelector('.lb-meta')!.textContent = extra?.caption || it.meta || '';
+      const subEl = box.querySelector<HTMLElement>('.lb-sub')!;
+      subEl.hidden = count < 2;
+      subEl.textContent = `${sub + 1} / ${count}`;
+      // Nothing to step through on a single item
+      box.querySelectorAll<HTMLElement>('.lb-prev, .lb-next').forEach((b) => (b.hidden = count < 2));
+      if (!rm) gsap.fromTo(m, { opacity: 0, x: dir * 40, scale: dir ? 1 : 0.96 }, { opacity: 1, x: 0, scale: 1, duration: 0.6, ease: 'expo.out' });
     };
     const openPhoto = (i: number) => {
       hum();
@@ -269,15 +308,30 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
       if (rm) { box.close(); return; }
       gsap.to(box, { opacity: 0, duration: 0.2, onComplete: () => box.close() });
     };
+    // Stop any video or player once it's closed
+    // (the event fires a moment later, so skip it if the viewer has reopened)
+    box.addEventListener('close', () => { if (!box.open) media.replaceChildren(); });
     box.querySelector('.lb-close')!.addEventListener('click', closePhoto);
-    box.querySelector('.lb-prev')!.addEventListener('click', () => showPhoto(boxAt - 1, -1));
-    box.querySelector('.lb-next')!.addEventListener('click', () => showPhoto(boxAt + 1, 1));
+    // Step through the open entry's series, looping round at either end
+    const stepBox = (d: 1 | -1) => {
+      const count = lengthOf(boxAt);
+      if (count > 1) showPhoto(boxAt, d, (sub + d + count) % count);
+    };
+    box.querySelector('.lb-prev')!.addEventListener('click', () => stepBox(-1));
+    box.querySelector('.lb-next')!.addEventListener('click', () => stepBox(1));
+    // Swipe sideways on touch screens
+    let swipeX = 0, swipeY = 0;
+    box.addEventListener('touchstart', (e) => { swipeX = e.touches[0].clientX; swipeY = e.touches[0].clientY; }, { passive: true });
+    box.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - swipeX, dy = e.changedTouches[0].clientY - swipeY;
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) stepBox(dx < 0 ? 1 : -1);
+    });
     // Clicking the dark space around the photo closes it; Esc does too
     box.addEventListener('click', (e) => { if (e.target === box) closePhoto(); });
     box.addEventListener('cancel', (e) => { e.preventDefault(); closePhoto(); });
     box.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft') showPhoto(boxAt - 1, -1);
-      if (e.key === 'ArrowRight') showPhoto(boxAt + 1, 1);
+      if (e.key === 'ArrowLeft') stepBox(-1);
+      if (e.key === 'ArrowRight') stepBox(1);
     });
 
     const field = createPhotoField({
@@ -288,11 +342,12 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
         if (i >= 0) show(i); else hide();
       },
       onOpen: openPhoto,
+      reduced: rm,
     });
     // Switch between the row and the field for a tab
     const useLayout = (key: string) => {
       field.setItems(data);
-      if (key === 'photography' && n) field.activate(); else field.deactivate();
+      if (key === 'journal' && n) field.activate(); else field.deactivate();
       sec.classList.toggle('is-field', field.active);
     };
     // Phones (touch screens or narrow windows) always show the details for the
@@ -536,6 +591,8 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
 
     // Entrance plays as the loader dissolves, or straight away on later pages
     const intro = () => {
+      // The journal plays its own entrance
+      if (field.active) { field.intro(); return; }
       if (rm || returning) return;
       gsap.fromTo(canvas, { opacity: 0 }, { opacity: 1, duration: 1.2, ease: 'power2.out' });
       vel = step * 9; // a quick turn in
@@ -590,7 +647,7 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     .is-field .details { display: none; }
   }
 
-  /* A photo, full screen */
+  /* A journal item, full screen */
   .lightbox {
     position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;
     margin: 0; padding: 0; border: 0; background: color-mix(in srgb, var(--bg) 94%, transparent);
@@ -598,10 +655,20 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
   }
   .lightbox::backdrop { background: transparent; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .lightbox[open] { display: grid; place-items: center; }
-  .lightbox img {
-    max-width: min(86vw, 1400px); max-height: 78svh; width: auto; height: auto;
-    border-radius: 6px; object-fit: contain; pointer-events: none;
+  /* Sized to its content, so clicks beside it reach the dialog and close it */
+  .lb-media { display: grid; place-items: center; pointer-events: none; }
+  .lb-media :global(img), .lb-media :global(video) {
+    display: block; max-width: min(86vw, 1400px); max-height: 78svh; width: auto; height: auto;
+    border-radius: 6px; object-fit: contain;
   }
+  .lb-media :global(video), .lb-media :global(iframe) { pointer-events: auto; background: #000; }
+  .lb-media :global(.embed) { width: min(86vw, 1200px, calc(78svh * 16 / 9)); aspect-ratio: 16 / 9; border: 0; border-radius: 6px; }
+  .lb-visit {
+    pointer-events: auto; padding: 0.35rem 0.7rem; border-radius: calc(var(--radius) / 2);
+    background: var(--ink); color: var(--bg); font-size: var(--step--1);
+  }
+  .lb-visit:hover { background: var(--accent); color: var(--accent-ink); }
+  .lb-visit[hidden] { display: none; }
   .lb-bar {
     position: absolute; left: calc(var(--gutter) + var(--pad)); right: calc(var(--gutter) + var(--pad));
     bottom: clamp(1.25rem, 4vh, 2.5rem); display: flex; align-items: baseline; gap: 1.5rem;
@@ -610,7 +677,9 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
   .lb-bar p { margin: 0; max-width: none; }
   .lb-title { font-family: var(--font-display); font-size: var(--step-2); font-weight: 500; letter-spacing: -0.05em; line-height: 1; }
   .lb-meta { color: var(--mute); font-size: var(--step--1); }
-  .lb-count { margin-left: auto !important; color: var(--mute); font-size: var(--step--1); }
+  .lb-sub { color: var(--ink); font-size: var(--step--1); }
+  .lb-sub[hidden] { display: none; }
+  .lb-btn[hidden] { display: none; }
   .lightbox:focus { outline: none; }
   /* Same as the nav's round buttons (Nav.astro) */
   .lb-btn {

@@ -19,7 +19,7 @@ export default config({
   ui: {
     brand: { name: 'jjuncreative' },
     navigation: {
-      Work: ['work', 'photography', 'experiments'],
+      Work: ['work', 'journal'],
       Pages: ['home', 'about', 'site'],
     },
   },
@@ -103,51 +103,63 @@ export default config({
       },
     }),
 
-    // Photography and Experiments: lighter items shown in the home carousel
-    // under their own tabs. Clicking one opens its link, if it has one.
-    photography: collection({
-      label: 'Photography',
+    // Visual journal: a collection of cool things (images, GIFs, video, links),
+    // shown on the home page as a field to drag around; clicking one opens it
+    // full screen
+    journal: collection({
+      label: 'Visual journal',
       slugField: 'title',
-      path: 'src/content/photography/*',
+      path: 'src/content/journal/*',
       format: 'yaml',
-      columns: ['title', 'year'],
+      columns: ['title', 'kind', 'year'],
       schema: {
         title: fields.slug({ name: { label: 'Title' } }),
-        year: fields.integer({ label: 'Year' }),
+        kind: fields.select({
+          label: 'Type',
+          options: [
+            { label: 'Photography', value: 'photo' },
+            { label: 'Image or GIF', value: 'image' },
+            { label: 'Video', value: 'video' },
+            { label: 'Link', value: 'link' },
+          ],
+          defaultValue: 'image',
+        }),
         image: fields.image({
-          label: 'Photo',
-          description: 'Export at about 2400px on the long edge, JPEG or WebP, with location data removed.',
-          directory: 'public/images/photography',
-          publicPath: '/images/photography/',
+          label: 'Image',
+          description: 'The image or GIF itself. For a video or link, the still shown in the grid. About 2000px on the long edge.',
+          directory: 'public/images/journal',
+          publicPath: '/images/journal/',
           validation: { isRequired: true },
         }),
-        location: fields.text({ label: 'Location', description: 'Shown in the details, e.g. Tokyo, Japan' }),
-        description: fields.text({ label: 'Description', multiline: true }),
-        link: fields.url({ label: 'Link', description: 'Optional: where clicking the card goes, e.g. an album or Instagram post' }),
-        color: fields.text({ label: 'Colour', description: 'Hex value, shown while the photo loads', defaultValue: '#2a2a2a' }),
-        order: fields.integer({ label: 'Sort order', description: 'Lower numbers show first. Leave blank to sort by year.' }),
-      },
-    }),
-
-    experiments: collection({
-      label: 'Experiments',
-      slugField: 'title',
-      path: 'src/content/experiments/*',
-      format: 'yaml',
-      columns: ['title', 'year'],
-      schema: {
-        title: fields.slug({ name: { label: 'Title' } }),
-        year: fields.integer({ label: 'Year' }),
-        image: fields.image({
-          label: 'Cover image',
-          directory: 'public/images/experiments',
-          publicPath: '/images/experiments/',
-          validation: { isRequired: true },
+        video: fields.file({
+          label: 'Video file',
+          description: 'For Video: an MP4 or WebM, under 20 MB (Cloudflare serves files up to 25 MB). For longer clips, use a YouTube or Vimeo link instead.',
+          directory: 'public/media/journal',
+          publicPath: '/media/journal/',
         }),
-        category: fields.text({ label: 'Type', description: 'e.g. WebGL, Motion, 3D' }),
-        tools: fields.array(fields.text({ label: 'Tool' }), { label: 'Tools', itemLabel: (p) => p.value }),
-        description: fields.text({ label: 'Description', multiline: true }),
-        link: fields.url({ label: 'Link', description: 'Optional: where clicking the card goes, e.g. a live demo or video' }),
+        link: fields.url({
+          label: 'Link',
+          description: 'For Link: the page it points to. A YouTube or Vimeo link plays in the viewer; anything else gets a Visit button.',
+        }),
+        more: fields.array(
+          fields.object({
+            image: fields.image({
+              label: 'Image',
+              directory: 'public/images/journal',
+              publicPath: '/images/journal/',
+              validation: { isRequired: true },
+            }),
+            caption: fields.text({ label: 'Caption' }),
+          }),
+          {
+            label: 'More images',
+            description: 'Turns the entry into a series: the viewer steps through these after the main image (or video).',
+            itemLabel: (p) => p.fields.caption.value || 'Image',
+          }
+        ),
+        source: fields.text({ label: 'Source', description: 'Who made it or where you found it, e.g. a studio, artist or site' }),
+        year: fields.integer({ label: 'Year' }),
+        description: fields.text({ label: 'Note', multiline: true }),
         color: fields.text({ label: 'Colour', description: 'Hex value, shown while the image loads', defaultValue: '#2a2a2a' }),
         order: fields.integer({ label: 'Sort order', description: 'Lower numbers show first. Leave blank to sort by year.' }),
       },
