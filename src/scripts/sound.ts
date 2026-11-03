@@ -42,7 +42,7 @@ function unlock() {
    swap without a reload, and the player isn't part of the page). Its volume
    goes through a Web Audio gain, since iPhones ignore a media element's own
    volume. Ogg where the browser plays it (smaller), MP3 elsewhere (Safari). */
-const MUSIC_SRC = { ogg: '/audio/quiet-horizon.ogg', mp3: '/audio/quiet-horizon.mp3' };
+const MUSIC_SRC = { ogg: '/audio/tidal-veil.ogg', mp3: '/audio/tidal-veil.mp3' };
 const MUSIC_VOLUME = 0.132; // quiet: well under the interface sounds
 const POS_KEY = 'music-pos';
 let music: HTMLAudioElement | null = null;
