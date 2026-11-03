@@ -1,8 +1,9 @@
 /* The photo field: photos on an endless staggered grid (alternate columns
    dropped by half a row, like brickwork) that the visitor drags around freely,
    with a fisheye at the screen edges (drawn by gallery.ts). The grid never
-   ends: cell (c, r) shows photo (c + r·skip) mod n, so any number of photos
-   fill it without the same one sitting next to itself. Each photo keeps its
+   ends: it repeats a large tile of cells, each given a photo at random (a
+   fresh shuffle on every visit) so that no photo sits next to itself and
+   every photo turns up about as often as the others. Each photo keeps its
    own shape inside its cell, with its title running up its right edge.
    Only the cells on screen are drawn, so it costs the same with 10 photos or
    1,000. */
@@ -23,7 +24,7 @@ export function createPhotoField(opts: {
 }) {
   const { canvas, labels, gallery } = opts;
   let items: Item[] = [];
-  let n = 0, skip = 1;
+  let n = 0;
   let active = false;
 
   // ── Cells ──
@@ -38,7 +39,40 @@ export function createPhotoField(opts: {
   };
   measure();
   const mod = (a: number, b: number) => ((a % b) + b) % b;
-  const itemOf = (c: number, r: number) => mod(c + r * skip, n);
+  // ── Which photo goes in each cell: a seeded shuffle, tiled ──
+  // A TC × TR tile is filled cell by cell. Each cell takes the least-used
+  // photo that none of its neighbours (left, right, above, below, and the two
+  // diagonal ones the brick offset brings close) already has, ties broken at
+  // random; the tile then repeats in every direction, wrapping round its
+  // edges so the seams follow the same rule
+  let TC = 1, TR = 1, tile: number[] = [0];
+  const shuffle = () => {
+    TC = Math.max(8, Math.min(24, n * 2)) & ~1; // even, so the brick offset lines up
+    TR = Math.max(6, Math.min(16, n));
+    tile = new Array(TC * TR).fill(-1);
+    // A new seed each page load, so every visit gets a different arrangement
+    let seed = (Math.random() * 4294967296) >>> 0;
+    const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
+    const used = new Array(n).fill(0);
+    const at = (c: number, r: number) => tile[mod(r, TR) * TC + mod(c, TC)];
+    for (let r = 0; r < TR; r++) {
+      for (let c = 0; c < TC; c++) {
+        // Odd columns sit half a row lower, so their diagonal neighbours are
+        // one row down; even columns' are one row up
+        const dr = c % 2 ? 1 : -1;
+        const near = [at(c - 1, r), at(c + 1, r), at(c, r - 1), at(c, r + 1), at(c - 1, r + dr), at(c + 1, r + dr)];
+        let ok = [...Array(n).keys()].filter((i) => !near.includes(i));
+        if (!ok.length) ok = [...Array(n).keys()].filter((i) => i !== at(c - 1, r));
+        if (!ok.length) ok = [0];
+        const least = Math.min(...ok.map((i) => used[i]));
+        const pick = ok.filter((i) => used[i] === least);
+        const i = pick[Math.floor(rand() * pick.length)];
+        tile[r * TC + c] = i;
+        used[i]++;
+      }
+    }
+  };
+  const itemOf = (c: number, r: number) => tile[mod(r, TR) * TC + mod(c, TC)];
   // A photo's rectangle in its cell, in scene px before the pan
   const box = (c: number, r: number) => {
     const i = itemOf(c, r);
@@ -232,9 +266,7 @@ export function createPhotoField(opts: {
     get dragging() { return dragging; },
     setItems(next: Item[]) {
       items = next; n = next.length;
-      // Rows step through the photos about 40% of the way round, so a photo's
-      // neighbours above and below are far from it in the list
-      skip = n > 4 ? Math.max(2, Math.round(n * 0.4)) : 1;
+      if (n) shuffle();
     },
     activate() {
       active = true; measure(); centre();

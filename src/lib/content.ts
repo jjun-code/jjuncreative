@@ -19,10 +19,13 @@ export const src = (i: Img, width?: number) => {
   return '';
 };
 
+// Entries ticked Hidden in Keystatic are left out everywhere: no card, no
+// page, no sitemap entry
 export async function getWork() {
   const entries = await reader.collections.work.all();
   return entries
     .map(({ slug, entry }) => ({ slug, ...entry }))
+    .filter((e) => !e.hidden)
     .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (b.year ?? 0) - (a.year ?? 0));
 }
 
@@ -31,6 +34,7 @@ export async function getJournal() {
   const entries = await reader.collections.journal.all();
   return entries
     .map(({ slug, entry }) => ({ slug, ...entry }))
+    .filter((e) => !e.hidden)
     .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (b.year ?? 0) - (a.year ?? 0));
 }
 

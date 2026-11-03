@@ -34,6 +34,11 @@ export default config({
       columns: ['title', 'year', 'category'],
       schema: {
         title: fields.slug({ name: { label: 'Project name' } }),
+        hidden: fields.checkbox({
+          label: 'Hidden',
+          description: 'Takes it off the site (and out of search) without deleting it. Untick to bring it back.',
+          defaultValue: false,
+        }),
         year: fields.integer({ label: 'Year', validation: { isRequired: true } }),
         category: fields.text({ label: 'Category', description: 'e.g. Product, Branding and Identity' }),
         tools: fields.array(fields.text({ label: 'Tool' }), {
@@ -114,6 +119,11 @@ export default config({
       columns: ['title', 'kind', 'year'],
       schema: {
         title: fields.slug({ name: { label: 'Title' } }),
+        hidden: fields.checkbox({
+          label: 'Hidden',
+          description: 'Takes it off the site (and out of search) without deleting it. Untick to bring it back.',
+          defaultValue: false,
+        }),
         kind: fields.select({
           label: 'Type',
           options: [
