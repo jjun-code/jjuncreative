@@ -21,6 +21,7 @@ export function createPhotoField(opts: {
   onHover: (i: number) => void; // photo index, or -1
   onOpen: (i: number) => void;
   reduced?: boolean; // skip the entrance
+  loader?: HTMLElement; // ring showing how many covers have loaded
 }) {
   const { canvas, labels, gallery } = opts;
   let items: Item[] = [];
@@ -116,11 +117,23 @@ export function createPhotoField(opts: {
   // behind them. grow() is 0 → 1 for a photo whose centre is at (x, y).
   let introAt = -1;
   // The entrance waits for every cover to load (so nothing pops in or changes
-  // shape mid-way), or 3 s, whichever comes first; until then nothing shows
+  // shape mid-way), or 10 s, whichever comes first; until then nothing shows
+  // but a ring filling as the covers arrive (after a moment, so a quick load
+  // doesn't flash it)
   let waitingSince = -1;
-  const coversReady = () => {
-    for (let i = 0; i < n; i++) if (gallery.aspectOf(i) === null) return false;
-    return true;
+  const coversLoaded = () => {
+    let k = 0;
+    for (let i = 0; i < n; i++) if (gallery.aspectOf(i) !== null) k++;
+    return k;
+  };
+  const showLoader = (p: number | null) => {
+    const el = opts.loader;
+    if (!el) return;
+    if (p === null) { el.classList.remove('on'); return; }
+    el.hidden = false;
+    el.classList.add('on');
+    el.style.setProperty('--p', String(p));
+    el.querySelector('span')!.textContent = `${Math.round(p * 100)}%`;
   };
   const INTRO = 1.6; // seconds until the furthest photo has landed
   const easeOut = (t: number) => 1 - Math.pow(1 - t, 4);
@@ -242,8 +255,12 @@ export function createPhotoField(opts: {
     const cells = n ? visible() : [];
     // Hold the entrance until the covers are in
     if (waitingSince >= 0) {
-      if (coversReady() || performance.now() - waitingSince > 3000) start();
-      else { gallery.draw(view, [], 0, true); labels.style.opacity = '0'; return; }
+      const k = coversLoaded(), waited = performance.now() - waitingSince;
+      if (k >= n || waited > 10000) { showLoader(null); start(); }
+      else {
+        if (waited > 150) showLoader(k / n);
+        gallery.draw(view, [], 0, true); labels.style.opacity = '0'; return;
+      }
     }
     labels.style.opacity = '';
     const cards: CardDraw[] = [];
@@ -278,6 +295,7 @@ export function createPhotoField(opts: {
     intro: () => { if (active) { centre(); intro(); } },
     deactivate() {
       active = false; dragging = false;
+      waitingSince = -1; showLoader(null);
       setHover(-1);
       labels.hidden = true;
       canvas.style.cursor = '';
