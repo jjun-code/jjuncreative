@@ -136,10 +136,9 @@ export default config({
         }),
         image: fields.image({
           label: 'Image',
-          description: 'The image or GIF itself. For a video or link, the still shown in the grid. About 2000px on the long edge.',
+          description: 'The image or GIF itself; for a video or link, the still shown in the grid. Leave empty for a Photography album: its photos all go under Photos below. About 2000px on the long edge.',
           directory: 'public/images/journal',
           publicPath: '/images/journal/',
-          validation: { isRequired: true },
         }),
         video: fields.file({
           label: 'Video file',
@@ -162,9 +161,9 @@ export default config({
             caption: fields.text({ label: 'Caption' }),
           }),
           {
-            label: 'More images',
-            description: 'Turns the entry into a series: the viewer steps through these after the main image (or video).',
-            itemLabel: (p) => p.fields.caption.value || 'Image',
+            label: 'Photos',
+            description: 'A Photography album: every photo, in order (drag to rearrange). A random one is the cover on each visit, and the viewer starts there. For other types, extra images shown after the main one.',
+            itemLabel: (p) => p.fields.caption.value || 'Photo',
           }
         ),
         source: fields.text({ label: 'Source', description: 'Who made it or where you found it, e.g. a studio, artist or site' }),

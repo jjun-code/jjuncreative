@@ -1,8 +1,8 @@
 title: Graduation
 hidden: true
 kind: photo
-image: /images/journal/graduation/image.webp
 more:
+  - image: /images/journal/graduation/image.webp
   - image: /images/journal/graduation/more/0/image.webp
   - image: /images/journal/graduation/more/1/image.webp
   - image: /images/journal/graduation/more/2/image.webp
