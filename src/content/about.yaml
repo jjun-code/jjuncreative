@@ -1,9 +1,10 @@
 headline: Product designer, photographer, and lifelong collector of curiosities.
 hello: >-
-  I look at problems holistically, shaping solutions that connect user needs,
-  business goals, and product strategy into one clear experience.
+  I craft visually compelling product experiences, translating complex ideas
+  into intuitive interfaces through thoughtful design, and strong visual
+  hierarchy.
 portrait:
-  image: /images/about/portrait.jpg
+  image: /images/about/portrait/image.jpg
 interests:
   - Photography
   - Motorsports
