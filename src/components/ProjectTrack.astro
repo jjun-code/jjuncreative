@@ -27,13 +27,18 @@ const sets = [
     // An entry with a video file is a video, whatever its Type says
     items: journal.map((j: any) => {
       const kind = j.video ? 'video' : j.kind || 'image';
+      const more = (j.more ?? []).filter((m: any) => m.image).map((m: any) => ({ img: m.image, caption: m.caption || '' }));
+      // A Photography album is just its list of photos (plus the main image,
+      // if one was set); the first is the cover until the page picks one
+      const photos = kind === 'photo' ? [...(j.image ? [{ img: img(j.image), caption: '' }] : []), ...more] : null;
       return {
-        title: j.title, img: img(j.image), tint: j.color || '#2a2a2a', href: j.link || '', slug: j.slug,
+        title: j.title, img: photos ? photos[0]?.img ?? '' : img(j.image), tint: j.color || '#2a2a2a', href: j.link || '', slug: j.slug,
         facts: [['Type', kinds[kind]], ['Source', j.source], ['Year', j.year]], tools: [], summary: j.description, cta: 'Visit',
         meta: [j.source, j.year].filter(Boolean).join(' · '),
         kind, video: j.video || '',
-        // A series: the extra images after the main one
-        more: (j.more ?? []).filter((m: any) => m.image).map((m: any) => ({ img: m.image, caption: m.caption || '' })),
+        // A series: the images after the cover
+        more: photos ? photos.slice(1) : more,
+        photos,
       };
     }),
   },
@@ -46,7 +51,7 @@ const icons: Record<string, string> = {
 // Tabs with nothing in them yet are left out (Design always shows)
 const tabs = sets.filter((s) => s.key === 'work' || s.items.length);
 // The client only needs what it draws and links to
-const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, img, tint, href, slug, meta, kind, video, more }: any) => ({ title, img, tint, href, slug, meta, kind, video, more })) }));
+const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, img, tint, href, slug, meta, kind, video, more, photos }: any) => ({ title, img, tint, href, slug, meta, kind, video, more, photos })) }));
 ---
 <section class="projects" id="work" aria-label="Work and visual journal" data-sets={JSON.stringify(clientSets)}>
   <div class="stage">
@@ -138,7 +143,7 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
   import { createPhotoField } from '../scripts/photoGrid';
   import { navigate } from 'astro:transitions/client';
 
-  type Item = { title: string; img: string; tint: string; href: string; slug: string; meta?: string; kind?: string; video?: string; more?: { img: string; caption: string }[] };
+  type Item = { title: string; img: string; tint: string; href: string; slug: string; meta?: string; kind?: string; video?: string; more?: { img: string; caption: string }[]; photos?: { img: string; caption: string }[] | null };
   type Set = { key: string; items: Item[] };
 
   // ── Geometry (pure, so it can also place a card before the page starts) ──
@@ -235,6 +240,15 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     const sec = document.querySelector<HTMLElement>('.projects');
     if (!sec) return;
     const sets: Set[] = JSON.parse(sec.dataset.sets!);
+    // Each visit, every Photography album gets a random cover; the viewer
+    // starts on it and carries on through the album in order, looping round
+    for (const it of sets.find((x) => x.key === 'journal')?.items ?? []) {
+      const p = it.photos;
+      if (!p || p.length < 2) continue;
+      const r = Math.floor(Math.random() * p.length);
+      it.img = p[r].img;
+      it.more = [...p.slice(r + 1), ...p.slice(0, r)];
+    }
     let current = sets.some((x) => x.key === memory.set) ? memory.set : 'work';
     const itemsOf = (key: string) => sets.find((x) => x.key === key)?.items ?? [];
     let data = itemsOf(current);

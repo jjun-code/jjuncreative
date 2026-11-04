@@ -1,8 +1,8 @@
 title: Railway Night
 hidden: true
-kind: image
-image: /images/journal/railway-night/image.webp
+kind: photo
 more:
+  - image: /images/journal/railway-night/image.webp
   - image: /images/journal/railway-night/more/0/image.webp
   - image: /images/journal/railway-night/more/1/image.webp
 color: '#2a2a2a'
