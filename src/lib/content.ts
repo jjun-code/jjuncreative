@@ -35,7 +35,7 @@ export async function getJournal() {
   return entries
     .map(({ slug, entry }) => ({ slug, ...entry }))
     .filter((e) => !e.hidden)
-    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (b.year ?? 0) - (a.year ?? 0));
+    .sort((a, b) => (b.year ?? 0) - (a.year ?? 0) || a.title.localeCompare(b.title));
 }
 
 export async function renderBody(body: () => Promise<{ node: any }>) {

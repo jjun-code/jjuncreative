@@ -120,57 +120,55 @@ export default config({
       schema: {
         title: fields.slug({ name: { label: 'Title' } }),
         hidden: fields.checkbox({
-          label: 'Hidden',
-          description: 'Takes it off the site (and out of search) without deleting it. Untick to bring it back.',
+          label: 'Hide from the site',
+          description: 'Takes it off the site without deleting it. Untick to bring it back.',
           defaultValue: false,
         }),
         kind: fields.select({
-          label: 'Type',
+          label: 'What is it?',
+          description: 'A video file below always plays as a video, whatever is picked here.',
           options: [
-            { label: 'Photography', value: 'photo' },
-            { label: 'Image or GIF', value: 'image' },
+            { label: 'Photo album', value: 'photo' },
+            { label: 'Single image or GIF', value: 'image' },
             { label: 'Video', value: 'video' },
             { label: 'Link', value: 'link' },
           ],
-          defaultValue: 'image',
+          defaultValue: 'photo',
         }),
+        more: fields.array(
+          fields.object({
+            image: fields.image({
+              label: 'Photo',
+              directory: 'public/images/journal',
+              publicPath: '/images/journal/',
+              validation: { isRequired: true },
+            }),
+            caption: fields.text({ label: 'Caption (optional)' }),
+          }),
+          {
+            label: 'Album photos',
+            description: 'Photo album: every photo, in the order they show. Drag to rearrange. About 2000px on the long edge.',
+            itemLabel: (p) => p.fields.caption.value || 'Photo',
+          }
+        ),
         image: fields.image({
-          label: 'Image',
-          description: 'The image or GIF itself; for a video or link, the still shown in the grid. Leave empty for a Photography album: its photos all go under Photos below. About 2000px on the long edge.',
+          label: 'Cover image (optional for albums)',
+          description: 'Photo album: leave empty and a random album photo is the cover on each visit, or set one to always use it. Single image or GIF: the image itself. Video or link: the still shown in the grid.',
           directory: 'public/images/journal',
           publicPath: '/images/journal/',
         }),
         video: fields.file({
           label: 'Video file',
-          description: 'An MP4 or WebM; if there is one, the entry plays it whatever its Type. Keep it under 20 MB (Cloudflare serves files up to 25 MB). For longer clips, use a YouTube or Vimeo link instead.',
+          description: 'Video: an MP4 or WebM under 20 MB (Cloudflare serves files up to 25 MB). For longer clips, use a YouTube or Vimeo link instead.',
           directory: 'public/media/journal',
           publicPath: '/media/journal/',
         }),
         link: fields.url({
           label: 'Link',
-          description: 'For Link: the page it points to. A YouTube or Vimeo link plays in the viewer; anything else gets a Visit button.',
+          description: 'Link: the page it points to. A YouTube or Vimeo link plays in the viewer; anything else gets a Visit button.',
         }),
-        more: fields.array(
-          fields.object({
-            image: fields.image({
-              label: 'Image',
-              directory: 'public/images/journal',
-              publicPath: '/images/journal/',
-              validation: { isRequired: true },
-            }),
-            caption: fields.text({ label: 'Caption' }),
-          }),
-          {
-            label: 'Photos',
-            description: 'A Photography album: every photo, in order (drag to rearrange). A random one is the cover on each visit, and the viewer starts there. For other types, extra images shown after the main one.',
-            itemLabel: (p) => p.fields.caption.value || 'Photo',
-          }
-        ),
-        source: fields.text({ label: 'Source', description: 'Who made it or where you found it, e.g. a studio, artist or site' }),
-        year: fields.integer({ label: 'Year' }),
-        description: fields.text({ label: 'Note', multiline: true }),
-        color: fields.text({ label: 'Colour', description: 'Hex value, shown while the image loads', defaultValue: '#2a2a2a' }),
-        order: fields.integer({ label: 'Sort order', description: 'Lower numbers show first. Leave blank to sort by year.' }),
+        year: fields.integer({ label: 'Year (optional)' }),
+        description: fields.text({ label: 'Note (optional)', description: 'Shown beside it on hover.', multiline: true }),
       },
     }),
   },
