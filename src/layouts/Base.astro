@@ -10,8 +10,9 @@ import { getSite } from '../lib/content';
 interface Props { title?: string; description?: string; image?: string; type?: 'website' | 'article'; footer?: boolean; footerCta?: boolean }
 const site = await getSite();
 const { title, description = site.description, image, type = 'website', footer = true, footerCta = true } = Astro.props;
-// The home page says who and where, for search results
-const fullTitle = title ? `${title} — jjuncreative` : `jjuncreative — ${site.role}, ${site.location}`;
+// Every page's browser tab and share title is just the name; the page's own
+// description still says what it is
+const fullTitle = 'jjuncreative';
 const url = new URL(Astro.url.pathname, Astro.site);
 // Share previews need absolute image URLs; pages without their own image use
 // the wordmark card (public/og.png, 1200×630)
