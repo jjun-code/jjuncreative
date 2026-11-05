@@ -181,6 +181,9 @@ const hex = (h: string) => {
   return m ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16) / 255) : [0.15, 0.15, 0.15];
 };
 
+// Touch-first devices (phones, tablets) get a lighter render
+const PHONE = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+
 export function createGallery(canvas: HTMLCanvasElement, sources: { src: string; tint: string }[]) {
   const gl = canvas.getContext('webgl2', { premultipliedAlpha: true, antialias: false });
   if (!gl) return null;
@@ -270,7 +273,15 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
       close: () => {},
     };
   };
-  const playGif = async (t: Tex, src: string) => {
+  // Held GIFs wait to start (and to advance) until playGifs(true)
+  let gifsOn = true;
+  const waiting: (() => void)[] = [];
+  const playGifs = (on: boolean) => {
+    gifsOn = on;
+    if (on) waiting.splice(0).forEach((go) => go());
+  };
+  const playGif = async (t: Tex, src: string): Promise<void> => {
+    if (!gifsOn) { waiting.push(() => { if (!t.dead) playGif(t, src); }); return; }
     try {
       const native = Decoder && (await Decoder.isTypeSupported?.('image/gif'));
       const g = await (native ? nativeGif(src) : scriptGif(src));
@@ -307,6 +318,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   const flush = () => { queue.shift()?.(); };
   const stepGifs = () => {
     const now = performance.now();
+    if (!gifsOn) return;
     for (const t of tex) {
       const g = t.gif;
       if (!g || g.busy || now < g.next || now - (t.seen ?? -1e9) > 500) continue;
@@ -314,8 +326,9 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
       g.frame(g.i).then((f) => {
         if (!t.dead) {
           upload(t, f.source);
-          // very short delays play at ~10 fps, as browsers do
-          g.next = performance.now() + (f.ms >= 20 ? f.ms : 100);
+          // very short delays play at ~10 fps, as browsers do; phones cap
+          // GIFs at ~12 fps to spare the decoding
+          g.next = performance.now() + Math.max(f.ms >= 20 ? f.ms : 100, PHONE ? 80 : 0);
           g.i = (g.i + 1) % g.count;
         }
         f.done();
@@ -371,7 +384,9 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   const targets = [0, 1].map(() => ({ fbo: gl.createFramebuffer()!, tex: gl.createTexture()! }));
   let w = 0, h = 0;
   const resize = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    // Phones get 1.5× instead of 2× pixels: the blur passes cost about half
+    // as much and the cards still look sharp at that size
+    const dpr = Math.min(window.devicePixelRatio || 1, PHONE ? 1.5 : 2);
     w = Math.round(canvas.clientWidth * dpr); h = Math.round(canvas.clientHeight * dpr);
     canvas.width = w; canvas.height = h;
     for (const t of targets) {
@@ -464,5 +479,5 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
     cache.forEach((t) => { t.dead = true; t.gif?.close(); });
     gl.getExtension('WEBGL_lose_context')?.loseContext();
   };
-  return { draw, resize, setSources, aspectOf, destroy };
+  return { draw, resize, setSources, aspectOf, playGifs, destroy };
 }
