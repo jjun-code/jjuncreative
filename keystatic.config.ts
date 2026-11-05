@@ -116,7 +116,7 @@ export default config({
       slugField: 'title',
       path: 'src/content/journal/*',
       format: 'yaml',
-      columns: ['title', 'kind', 'year'],
+      columns: ['title', 'category', 'year'],
       schema: {
         title: fields.slug({ name: { label: 'Title' } }),
         hidden: fields.checkbox({
@@ -124,16 +124,18 @@ export default config({
           description: 'Takes it off the site without deleting it. Untick to bring it back.',
           defaultValue: false,
         }),
-        kind: fields.select({
-          label: 'What is it?',
-          description: 'A video file below always plays as a video, whatever is picked here.',
+        category: fields.select({
+          label: 'Category',
+          description: 'Shown on hover. How it plays comes from what you add below: photos make an album, a video file plays as a video, a link opens or plays in the viewer.',
           options: [
-            { label: 'Photo album', value: 'photo' },
-            { label: 'Single image or GIF', value: 'image' },
-            { label: 'Video', value: 'video' },
-            { label: 'Link', value: 'link' },
+            { label: 'Photography', value: 'photography' },
+            { label: 'Motion Graphics', value: 'motion' },
+            { label: 'Videography', value: 'videography' },
+            { label: 'Illustration', value: 'illustration' },
+            { label: 'Interaction Design', value: 'interaction' },
+            { label: '3D Rendering', value: '3d' },
           ],
-          defaultValue: 'photo',
+          defaultValue: 'photography',
         }),
         more: fields.array(
           fields.object({
@@ -147,25 +149,25 @@ export default config({
           }),
           {
             label: 'Album photos',
-            description: 'Photo album: every photo, in the order they show. Drag to rearrange. About 2000px on the long edge.',
+            description: 'For an album: every image, in the order they show. Drag to rearrange. About 2000px on the long edge.',
             itemLabel: (p) => p.fields.caption.value || 'Photo',
           }
         ),
         image: fields.image({
           label: 'Cover image (optional for albums)',
-          description: 'Photo album: leave empty and a random album photo is the cover on each visit, or set one to always use it. Single image or GIF: the image itself. Video or link: the still shown in the grid.',
+          description: 'Album: leave empty and a random album photo is the cover on each visit, or set one to always use it. A single image or GIF: the image itself. Video or link: the still shown in the grid.',
           directory: 'public/images/journal',
           publicPath: '/images/journal/',
         }),
         video: fields.file({
           label: 'Video file',
-          description: 'Video: an MP4 or WebM under 20 MB (Cloudflare serves files up to 25 MB). For longer clips, use a YouTube or Vimeo link instead.',
+          description: 'An MP4 or WebM under 20 MB (Cloudflare serves files up to 25 MB); it plays in the viewer. For longer clips, use a YouTube or Vimeo link instead.',
           directory: 'public/media/journal',
           publicPath: '/media/journal/',
         }),
         link: fields.url({
           label: 'Link',
-          description: 'Link: the page it points to. A YouTube or Vimeo link plays in the viewer; anything else gets a Visit button.',
+          description: 'A YouTube or Vimeo link plays in the viewer; any other link gets a Visit button.',
         }),
         year: fields.integer({ label: 'Year (optional)' }),
         description: fields.text({ label: 'Note (optional)', description: 'Shown beside it on hover.', multiline: true }),

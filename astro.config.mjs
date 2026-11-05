@@ -12,7 +12,7 @@ export default defineConfig({
   site: 'https://www.jjuncreative.com',
   output: 'static',
   // The contact page was folded into About; keep old links working
-  redirects: { '/contact': '/about' },
+  redirects: { '/contact': '/about', '/work': '/' },
   adapter: isDev
     ? node({ mode: 'standalone' })
     : // Pages read content files from disk at build time, so prerender in Node rather than workerd.

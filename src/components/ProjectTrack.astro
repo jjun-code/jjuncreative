@@ -11,7 +11,10 @@
 // screen, where it plays if it's a video and links out if it's a link.
 import { src } from '../lib/content';
 const { work, journal } = Astro.props;
-const kinds: Record<string, string> = { photo: 'Photography', image: 'Image', video: 'Video', link: 'Link' };
+const categories: Record<string, string> = {
+  photography: 'Photography', motion: 'Motion Graphics', videography: 'Videography',
+  illustration: 'Illustration', interaction: 'Interaction Design', '3d': '3D Rendering',
+};
 const img = (i: any) => (typeof i === 'string' ? i : src(i, 1200)) || '';
 const sets = [
   {
@@ -24,17 +27,19 @@ const sets = [
   },
   {
     key: 'journal', label: 'Visual journal',
-    // An entry with a video file is a video, whatever its Type says
+    // How an entry plays comes from what's in it, not its category: a video
+    // file plays as a video, album photos make an album, and a link (with
+    // nothing else) opens or plays in the viewer
     items: journal.map((j: any) => {
-      const kind = j.video ? 'video' : j.kind || 'image';
       const more = (j.more ?? []).filter((m: any) => m.image).map((m: any) => ({ img: m.image, caption: m.caption || '' }));
-      // A photo album is its list of photos. Its cover is the one set in
+      const kind = j.video ? 'video' : more.length ? 'photo' : j.link ? 'link' : 'image';
+      // An album is its list of photos. Its cover is the one set in
       // Keystatic, or a random album photo the page picks on each visit
-      const photos = kind === 'photo' && more.length ? more : null;
+      const photos = kind === 'photo' ? more : null;
       const cover = photos && j.image ? img(j.image) : '';
       return {
         title: j.title, img: photos ? cover || photos[0].img : img(j.image), tint: '#2a2a2a', href: j.link || '', slug: j.slug,
-        facts: [['Type', kinds[kind]], ['Year', j.year]], tools: [], summary: j.description, cta: 'Visit',
+        facts: [['Category', categories[j.category]], ['Year', j.year]], tools: [], summary: j.description, cta: 'Visit',
         meta: j.year ? String(j.year) : '',
         kind, video: j.video || '',
         // A series: the images after the first
@@ -307,12 +312,21 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
         m = make('img', { src: extra.img, alt: extra.caption || it.title });
       } else if (it.video) {
         // Muted so browsers allow it to start on its own; the controls can unmute
-        const v = make('video', { src: it.video, poster: it.img, controls: true, autoplay: true, muted: true, loop: true, playsInline: true, preload: 'auto' });
-        // No download button or picture-in-picture in the controls
-        v.setAttribute('controlslist', 'nodownload noremoteplayback');
+        // No player controls or timeline: it just loops, muted so it can start
+        // on its own, with a round button in the corner to turn the sound on
+        const v = make('video', { src: it.video, poster: it.img, autoplay: true, muted: true, loop: true, playsInline: true, preload: 'auto' });
         v.disablePictureInPicture = true;
         v.play().catch(() => {});
-        m = v;
+        const mute = make('button', { type: 'button', className: 'lb-mute' });
+        const showMute = () => {
+          mute.setAttribute('aria-label', v.muted ? 'Turn sound on' : 'Turn sound off');
+          mute.setAttribute('aria-pressed', String(!v.muted));
+        };
+        mute.innerHTML = '<svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3.5 7.5h2.6L10 4.4v11.2l-3.9-3.1H3.5Z" fill="currentColor"/><g class="waves" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12.8 7.4a3.6 3.6 0 0 1 0 5.2"/><path d="M14.9 5.3a6.6 6.6 0 0 1 0 9.4"/></g><path class="off" d="M12.6 7.6l4.6 4.8M17.2 7.6l-4.6 4.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+        mute.addEventListener('click', () => { v.muted = !v.muted; if (!v.muted) v.play().catch(() => {}); showMute(); });
+        showMute();
+        m = make('div', { className: 'lb-video' });
+        m.append(v, mute);
       } else if (embed) {
         m = make('iframe', { src: embed, title: it.title, allow: 'autoplay; fullscreen; picture-in-picture', allowFullscreen: true, className: 'embed' });
       } else {
@@ -411,7 +425,10 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
       clearTimeout(hideTimer);
       if (i === shown) return;
       shown = i;
-      entries.forEach((e, k) => (e.hidden = k !== i));
+      // Hide every other entry, from either tab: one can be left showing from
+      // the tab being switched away from (e.g. hovered during the swap fade)
+      const target = entries[i];
+      sec.querySelectorAll<HTMLElement>('.entry').forEach((e) => (e.hidden = e !== target));
       details.classList.add('on');
       if (!rm) gsap.fromTo(entries[i], { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: 'expo.out' });
     };
@@ -647,6 +664,10 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
           data = itemsOf(key);
           n = data.length;
           entries = entriesOf(key);
+          // Whatever was hovered during the fade belonged to the old tab
+          shown = -1;
+          details.classList.remove('on');
+          sec.querySelectorAll<HTMLElement>('.entry').forEach((e) => (e.hidden = true));
           gallery.setSources(data.map((d) => ({ src: d.img, tint: d.tint })));
           layout();
           useLayout(key);
@@ -754,12 +775,25 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     border-radius: 6px; object-fit: contain;
   }
   .lb-media :global(video), .lb-media :global(iframe) { pointer-events: auto; background: #000; }
+  /* A video and its sound button, which sits in its bottom-right corner */
+  .lb-media :global(.lb-video) { position: relative; pointer-events: auto; }
+  .lb-media :global(.lb-mute) {
+    position: absolute; right: 0.75rem; bottom: 0.75rem; width: 2.75rem; height: 2.75rem; border-radius: 999px;
+    display: grid; place-items: center; color: #fff;
+    background: #0009; border: 1px solid #ffffff38; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    transition: background-color 0.3s;
+  }
+  .lb-media :global(.lb-mute:hover) { background: #000c; }
+  .lb-media :global(.lb-mute .off) { display: block; }
+  .lb-media :global(.lb-mute .waves) { display: none; }
+  .lb-media :global(.lb-mute[aria-pressed='true'] .off) { display: none; }
+  .lb-media :global(.lb-mute[aria-pressed='true'] .waves) { display: block; }
   .lb-media :global(.embed) { width: min(86vw, 1200px, calc(78svh * 16 / 9)); aspect-ratio: 16 / 9; border: 0; border-radius: 6px; }
   .lb-visit {
     pointer-events: auto; padding: 0.35rem 0.7rem; border-radius: calc(var(--radius) / 2);
     background: var(--ink); color: var(--bg); font-size: var(--step--1);
   }
-  .lb-visit:hover { background: var(--accent); color: var(--accent-ink); }
+  .lb-visit:hover { background: var(--btn); color: var(--btn-ink); }
   .lb-visit[hidden] { display: none; }
   .lb-bar {
     position: absolute; left: calc(var(--gutter) + var(--pad)); right: calc(var(--gutter) + var(--pad));
@@ -815,7 +849,7 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
   }
   .switch[hidden] { display: none; }
   .switch-hl {
-    position: absolute; left: 0; top: 4px; bottom: 4px; border-radius: 999px; background: var(--accent);
+    position: absolute; left: 0; top: 4px; bottom: 4px; border-radius: 999px; background: var(--btn);
   }
   .switch-hl.glide { transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), width 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
   .switch button {
@@ -825,7 +859,7 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
   }
   .switch svg { flex: none; }
   .switch button:hover { color: var(--ink); }
-  .switch button[aria-pressed='true'] { color: var(--accent-ink); }
+  .switch button[aria-pressed='true'] { color: var(--btn-ink); }
   .switch button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   /* Label: a 0fr → 1fr column, open on the active tab and on hover */
   .lbl {
