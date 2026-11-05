@@ -277,11 +277,34 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
       if (g && !t.dead) t.gif = g; else g?.close();
     } catch {}
   };
+  // Cards are never much more than ~1000 device px across, so images are
+  // scaled down to fit MAX before going to the GPU: a quarter of the work for
+  // a 2000px photo. GIF frames go through one small canvas each.
+  const MAX = 1024;
+  const fit = (w: number, h: number) => {
+    const k = Math.min(1, MAX / Math.max(w, h));
+    return [Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k))];
+  };
+  const shrinkers = new WeakMap<Tex, HTMLCanvasElement>();
   const upload = (t: Tex, source: TexImageSource) => {
+    const sw = (source as any).displayWidth ?? (source as any).width, sh = (source as any).displayHeight ?? (source as any).height;
+    let src: TexImageSource = source;
+    if (sw > MAX || sh > MAX) {
+      let c = shrinkers.get(t);
+      if (!c) { c = document.createElement('canvas'); shrinkers.set(t, c); }
+      const [w, h] = fit(sw, sh);
+      if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+      c.getContext('2d')!.drawImage(source as CanvasImageSource, 0, 0, w, h);
+      src = c;
+    }
     gl.bindTexture(gl.TEXTURE_2D, t.tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
     gl.generateMipmap(gl.TEXTURE_2D);
   };
+  // Uploads wait in a queue and go one per frame, so a tab's worth of
+  // images arriving together doesn't freeze one frame
+  const queue: (() => void)[] = [];
+  const flush = () => { queue.shift()?.(); };
   const stepGifs = () => {
     const now = performance.now();
     for (const t of tex) {
@@ -300,28 +323,46 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
       }).catch(() => { t.gif = undefined; });
     }
   };
+  // Each image is decoded and scaled off the main thread, then queued for
+  // upload. Textures are kept by address,
+  // so switching tabs back and forth reuses them instead of reloading.
+  const cache = new Map<string, Tex>();
   const load = (s: { src: string; tint: string }): Tex => {
+    const hit = s.src ? cache.get(s.src) : undefined;
+    if (hit) return hit;
     const t: Tex = { tex: gl.createTexture()!, tint: hex(s.tint), aspect: 1, loaded: 0 };
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => {
-      gl.bindTexture(gl.TEXTURE_2D, t.tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-      gl.generateMipmap(gl.TEXTURE_2D);
+    if (s.src) cache.set(s.src, t);
+    // Decoded and scaled in one step from the downloaded file, in the
+    // background (no main-thread work): MAX px wide, height in proportion
+    const decode = async (): Promise<{ source: TexImageSource; w: number; h: number }> => {
+      try {
+        const bmp = await createImageBitmap(await (await fetch(s.src)).blob(), { resizeWidth: MAX, resizeQuality: 'medium' });
+        return { source: bmp, w: bmp.width, h: bmp.height };
+      } catch {
+        // Older browsers: an ordinary image, scaled at upload
+        const img = new Image();
+        img.src = s.src;
+        await img.decode();
+        return { source: img, w: img.naturalWidth, h: img.naturalHeight };
+      }
+    };
+    if (s.src) decode().then(({ source, w, h }) => queue.push(() => {
+      if (t.dead) return;
+      upload(t, source);
+      (source as ImageBitmap).close?.();
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      t.aspect = img.naturalWidth / img.naturalHeight;
+      t.aspect = w / h;
       t.loaded = 1;
       if (/\.gif(\?|$)/i.test(s.src)) playGif(t, s.src);
-    };
-    if (s.src) img.src = s.src;
+    }), () => {});
     return t;
   };
   let tex = sources.map(load);
-  /** Swap in a different set of card images (the home page's tabs). */
+  /** Swap in a different set of card images (the home page's tabs). Images
+      already loaded are reused; GIFs off screen simply stop advancing. */
   const setSources = (next: { src: string; tint: string }[]) => {
-    tex.forEach((t) => { t.dead = true; t.gif?.close(); gl.deleteTexture(t.tex); });
     tex = next.map(load);
   };
 
@@ -350,6 +391,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   /** Cards must come back to front. vel: scroll speed, adds to the effect.
       radial: the photo field's fisheye instead of the row's side lens. */
   const draw = (v: View, cards: CardDraw[], vel: number, radial = false) => {
+    flush();
     stepGifs();
     gl.viewport(0, 0, w, h);
     gl.bindFramebuffer(gl.FRAMEBUFFER, targets[0].fbo);
@@ -419,7 +461,7 @@ export function createGallery(canvas: HTMLCanvasElement, sources: { src: string;
   const aspectOf = (i: number) => (tex[i]?.loaded ? tex[i].aspect : null);
 
   const destroy = () => {
-    tex.forEach((t) => { t.dead = true; t.gif?.close(); });
+    cache.forEach((t) => { t.dead = true; t.gif?.close(); });
     gl.getExtension('WEBGL_lose_context')?.loseContext();
   };
   return { draw, resize, setSources, aspectOf, destroy };
