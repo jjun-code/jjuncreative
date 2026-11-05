@@ -53,9 +53,9 @@ const Tag = href ? 'a' : 'button';
   .text { display: grid; }
   .sub { font-size: var(--step--2); opacity: 0.8; letter-spacing: -0.01em; }
 
-  .accent { background: var(--accent); color: var(--accent-ink); }
-  .accent .badge { background: var(--accent-ink); color: var(--accent); }
-  .accent:hover .badge, .accent:focus-visible .badge { background: var(--accent); color: var(--accent-ink); }
+  .accent { background: var(--btn); color: var(--btn-ink); }
+  .accent .badge { background: var(--btn-ink); color: var(--btn); }
+  .accent:hover .badge, .accent:focus-visible .badge { background: var(--btn); color: var(--btn-ink); }
 
   .ghost { border: 1px solid var(--line-strong); color: var(--ink); background: color-mix(in srgb, var(--panel) 40%, transparent); backdrop-filter: blur(6px); }
   .ghost .badge { background: var(--ink); color: var(--bg); }

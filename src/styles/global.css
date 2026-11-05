@@ -26,6 +26,8 @@
   --inverse-ink: #141414;
   --accent: #8cff00;      /* main button, menu, highlights */
   --accent-ink: #141414;  /* text on the accent */
+  --btn: var(--accent);   /* filled buttons and the active tab pill */
+  --btn-ink: var(--accent-ink);
   --accent-text: var(--accent); /* accent used as text on the page */
   --dither: 255, 255, 255; /* background pixel colour, as r, g, b */
 
@@ -71,6 +73,8 @@
   --inverse-ink: #ffffff;
   --accent: #fd51cc;
   --accent-ink: #0b31bd;  /* deep blue reads on the pink; white doesn't */
+  --btn: #0b31bd;         /* buttons: white on deep blue (pink stays for highlights) */
+  --btn-ink: #ffffff;
   --accent-text: #c8189b; /* pink deep enough to read as text on white */
   --dither: 11, 49, 189;
   --grid-line: #0b31bd14;

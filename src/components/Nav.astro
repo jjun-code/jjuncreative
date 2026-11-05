@@ -1,23 +1,16 @@
 ---
 import Logo from './Logo.astro';
-const path = Astro.url.pathname;
-const links = [
-  { href: '/', label: 'Home' },
-  { href: '/work', label: 'Work' },
-  { href: '/about', label: 'About' },
-];
-const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWith(href));
+import { getSite } from '../lib/content';
+const site = await getSite();
 ---
 <header class="nav wrap">
   <a href="/" class="mark" aria-label="jjuncreative home"><Logo /></a>
 
   <div class="actions">
-    <!-- Each button widens to show its label on hover (desktop). Contact
-         details live in the About page footer. -->
-    <a href="/about" class="round accent" aria-label="About">
-      <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="6.8" r="3.3" fill="currentColor" /><path d="M3.5 17a6.5 6.5 0 0 1 13 0Z" fill="currentColor" /></svg></span>
-      <span class="lbl" aria-hidden="true"><span><span>About</span></span></span>
-    </a>
+    <!-- Settings first, then where to go, with the main action at the far
+         right. Each button widens to show its label on hover (desktop). The
+         primary one opens the message window in the bottom-right corner (Compose.astro;
+         the mailto link is for when scripts don't run) -->
     <button class="round sound-btn" aria-pressed="true" aria-label="Sound">
       <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3.5 7.5h2.6L10 4.4v11.2l-3.9-3.1H3.5Z" fill="currentColor" /><g class="waves" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12.8 7.4a3.6 3.6 0 0 1 0 5.2" /><path d="M14.9 5.3a6.6 6.6 0 0 1 0 9.4" /></g><path class="off" d="M12.6 7.6l4.6 4.8M17.2 7.6l-4.6 4.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" /></svg></span>
       <span class="lbl" aria-hidden="true"><span><span>Sound</span></span></span>
@@ -27,39 +20,20 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
       <svg class="moon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M15.8 12.6A6.5 6.5 0 0 1 7.4 4.2a6.5 6.5 0 1 0 8.4 8.4Z" fill="currentColor" /></svg></span>
       <span class="lbl" aria-hidden="true"><span><span>Theme</span></span></span>
     </button>
-    <button class="round menu-btn" aria-expanded="false" aria-controls="menu" aria-label="Menu">
-      <span class="ico"><span class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i></span></span>
-      <span class="lbl" aria-hidden="true"><span><span>Menu</span></span></span>
-    </button>
+    <a href="/about" class="round" aria-label="About">
+      <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="6.8" r="3.3" fill="currentColor" /><path d="M3.5 17a6.5 6.5 0 0 1 13 0Z" fill="currentColor" /></svg></span>
+      <span class="lbl" aria-hidden="true"><span><span>About</span></span></span>
+    </a>
+    <a href={`mailto:${site.email}`} class="round accent" aria-label="Send a message" data-compose>
+      <span class="ico"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5" fill="currentColor" /><path d="m3.5 6 6.5 5 6.5-5" fill="none" stroke="var(--btn)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg></span>
+      <span class="lbl" aria-hidden="true"><span><span>Message</span></span></span>
+    </a>
   </div>
 
 </header>
 
-<!-- Menu: a compact panel that grows out of the menu button. A highlight
-     pill rests on the current page and glides to whichever link you hover. -->
-<div id="menu" class="menu" hidden>
-  <div class="menu-backdrop" aria-hidden="true"></div>
-  <section class="menu-panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="menu-title">
-    <button class="menu-head" type="button" aria-label="Close menu">
-      <span id="menu-title">Menu</span>
-      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" /></svg>
-    </button>
-    <nav class="menu-links" aria-label="Main">
-      <span class="hl" aria-hidden="true"></span>
-      {links.map((l, i) => (
-        <a href={l.href} aria-current={isCurrent(l.href) ? 'page' : undefined}>
-          <span class="idx" aria-hidden="true">{String(i + 1).padStart(2, '0')}</span>
-          <span class="name">{l.label}</span>
-          <span class="here" aria-hidden="true"></span>
-        </a>
-      ))}
-    </nav>
-  </section>
-</div>
-
 <script>
   import { isMuted, setMuted } from '../scripts/sound';
-  import { gsap, reduced, getLenis } from '../scripts/smooth';
   import { onPage } from '../scripts/page';
 
   onPage(() => {
@@ -96,92 +70,6 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
       });
     }
 
-    // ── Menu ──
-    const btn = document.querySelector<HTMLButtonElement>('.menu-btn');
-    const menu = document.getElementById('menu');
-    if (btn && menu) {
-      const panel = menu.querySelector<HTMLElement>('.menu-panel')!;
-      const head = menu.querySelector<HTMLElement>('.menu-head')!;
-      const backdrop = menu.querySelector<HTMLElement>('.menu-backdrop')!;
-      const nav = menu.querySelector<HTMLElement>('.menu-links')!;
-      const hl = nav.querySelector<HTMLElement>('.hl')!;
-      const items = [...nav.querySelectorAll<HTMLAnchorElement>('a')];
-      const current = items.find((a) => a.hasAttribute('aria-current'));
-      const rm = reduced();
-      let tl: ReturnType<typeof gsap.timeline> | null = null;
-      // The other header buttons make room for the open panel: the (hidden)
-      // menu button widens to the panel's width, so the row pushes them over.
-      // If there isn't room beside the logo, they (and the logo, which the
-      // panel would cover) fade out instead.
-      const others = [...btn.parentElement!.children].filter((c): c is HTMLElement => c !== btn);
-      const logo = document.querySelector<HTMLElement>('.nav .mark');
-      let roomy = true;
-
-      // The highlight pill: placed instantly when the panel opens, glides after
-      const moveHl = (a: HTMLElement | undefined, glide = true) => {
-        hl.classList.toggle('glide', glide);
-        if (!a) { hl.style.opacity = '0'; return; }
-        hl.style.opacity = '1';
-        hl.style.height = `${a.offsetHeight}px`;
-        hl.style.transform = `translateY(${a.offsetTop}px)`;
-      };
-      items.forEach((a) => a.addEventListener('pointerenter', () => moveHl(a)));
-      items.forEach((a) => a.addEventListener('focus', () => moveHl(a)));
-      nav.addEventListener('pointerleave', () => moveHl(current));
-
-      // Clip showing only a button-sized top-right corner of the panel
-      const collapsed = () => {
-        const b = btn.getBoundingClientRect();
-        return `inset(0px 0px ${panel.offsetHeight - b.height}px ${panel.offsetWidth - b.width}px round ${b.height / 2}px)`;
-      };
-      const full = 'inset(0px 0px 0px 0px round 24px)';
-
-      const set = (open: boolean, byKeyboard = false) => {
-        btn.setAttribute('aria-expanded', String(open));
-        document.documentElement.classList.toggle('menu-open', open);
-        tl?.kill();
-        if (open) {
-          // Pin the panel's top-right corner to the menu button
-          const b = btn.getBoundingClientRect();
-          panel.style.top = `${b.top}px`;
-          panel.style.right = `${window.innerWidth - b.right}px`;
-          panel.style.setProperty('--edge', `${window.innerWidth - b.right}px`);
-          menu.hidden = false;
-          // Start from the button's current (maybe hover-widened) size
-          const w0 = btn.offsetWidth;
-          btn.style.width = `${w0}px`;
-          btn.style.visibility = 'hidden';
-          getLenis()?.stop();
-          moveHl(current, false);
-          const grow = panel.offsetWidth - w0;
-          roomy = others.length > 0 && others[0].getBoundingClientRect().left - grow > (logo?.getBoundingClientRect().right ?? 0) + 16;
-          tl = gsap.timeline()
-            .to(roomy ? btn : [...others, logo], roomy ? { width: panel.offsetWidth, duration: rm ? 0.01 : 0.26, ease: 'expo.out' } : { opacity: 0, duration: rm ? 0.01 : 0.15 }, 0)
-            .fromTo(backdrop, { opacity: 0 }, { opacity: 1, duration: rm ? 0.01 : 0.14, ease: 'power1.out' }, 0)
-            .fromTo(panel, { clipPath: collapsed(), x: 15 }, { clipPath: full, x: 0, duration: rm ? 0.01 : 0.26, ease: 'expo.out' }, 0)
-            .fromTo(head, { opacity: 0, y: -3 }, { opacity: 1, y: 0, duration: rm ? 0.01 : 0.2, ease: 'power2.out' }, 0);
-          // Keyboard users land on a link; a mouse click focuses the panel
-          // itself so no focus ring flashes up
-          (byKeyboard ? current ?? items[0] : panel).focus({ preventScroll: true });
-        } else {
-          tl = gsap.timeline({ onComplete: () => { menu.hidden = true; btn.style.visibility = ''; btn.style.width = ''; getLenis()?.start(); } })
-            .to(roomy ? btn : [...others, logo], roomy
-              ? { width: parseFloat(getComputedStyle(btn).minWidth), duration: rm ? 0.01 : 0.2, ease: 'expo.out' }
-              : { opacity: 1, duration: rm ? 0.01 : 0.2, clearProps: 'opacity' }, 0)
-            .to(head, { opacity: 0, duration: rm ? 0.01 : 0.05 }, 0)
-            .to(panel, { clipPath: collapsed(), duration: rm ? 0.01 : 0.2, ease: 'expo.out' }, 0)
-            .to(backdrop, { opacity: 0, duration: rm ? 0.01 : 0.14, ease: 'power1.out' }, 0);
-        }
-      };
-      btn.addEventListener('click', (e) => set(true, e.detail === 0));
-      head.addEventListener('click', () => { set(false); btn.focus(); });
-      backdrop.addEventListener('click', () => set(false));
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && btn.getAttribute('aria-expanded') === 'true') { set(false); btn.focus(); }
-      }, { signal });
-      window.addEventListener('resize', () => { if (!menu.hidden) set(false); }, { signal });
-    }
-
     return () => ac.abort();
   });
 </script>
@@ -206,7 +94,7 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
     backdrop-filter: blur(8px);
     transition: background-color 0.3s, opacity 0.15s ease-out;
   }
-  .round.accent { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+  .round.accent { background: var(--btn); border-color: transparent; color: var(--btn-ink); }
   .round:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
   /* Icon in a fixed circle-sized box at the left */
   .ico {
@@ -228,8 +116,6 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
     /* The others step back while one is hovered */
     .actions:has(.round:hover) .round:not(:hover) { opacity: 0.5; }
   }
-  /* With the menu open the others stay usable but quieter */
-  :global(html.menu-open) .round:not(:hover) { opacity: 0.6; }
   .sound-btn .off { display: none; }
   .sound-btn[aria-pressed='false'] .off { display: block; }
   .sound-btn[aria-pressed='false'] .waves { display: none; }
@@ -238,58 +124,4 @@ const isCurrent = (href: string) => (href === '/' ? path === '/' : path.startsWi
   .theme-btn:hover svg { transform: rotate(-20deg); }
   :global([data-theme='light']) .theme-btn .sun, :global([data-theme='dark']) .theme-btn .moon { display: none; }
 
-  .dots { display: grid; grid-template-columns: 5px 5px; gap: 5px; }
-  .dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-
-  /* ── Menu panel ── */
-  /* Just under the header, so the other buttons stay on top of the dimmed page;
-     the menu button itself is hidden while its panel is open */
-  .menu { position: fixed; inset: 0; z-index: 49; }
-  :global(html.menu-open) { overflow: hidden; }
-  .menu-backdrop { position: absolute; inset: 0; background: #0000005c; }
-  /* Always dark, like a floating palette, whatever the page theme */
-  .menu-panel {
-    /* --edge is the gap to the right of the menu button; kept on both sides */
-    position: absolute; width: 316px; max-width: calc(100vw - 2 * var(--edge, 1rem));
-    max-height: calc(100dvh - 2.5rem); overflow-y: auto; overscroll-behavior: contain;
-    padding: 0 8px 8px; border-radius: 24px;
-    background: #1c1c1ce0; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-    box-shadow: inset 0 0 0 1px #ffffff38, 0 16px 48px #00000038;
-    color: #fff; font-size: var(--step-0); font-weight: 500; line-height: 1.25; letter-spacing: -0.02em;
-  }
-  /* The whole header row closes the panel */
-  .menu-head {
-    display: flex; align-items: center; justify-content: space-between; width: calc(100% + 16px);
-    height: 60px; margin: 0 -8px; padding: 0 13px 0 24px; border-radius: 16px;
-    color: #ffffffad; transition: color 0.15s;
-  }
-  .menu-head:hover { color: #fff; }
-  .menu-panel:focus { outline: none; }
-
-  .menu-links { position: relative; isolation: isolate; display: grid; }
-  .hl {
-    position: absolute; inset: 0 0 auto; z-index: -1; border-radius: 16px;
-    background: #ffffff17; opacity: 0;
-    transition: opacity 0.12s ease-out;
-  }
-  .hl.glide {
-    transition: transform 0.24s cubic-bezier(0.165, 0.84, 0.44, 1), height 0.24s cubic-bezier(0.165, 0.84, 0.44, 1), opacity 0.12s ease-out;
-  }
-  .menu-links a {
-    display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 12px 16px; border-radius: 16px;
-    color: #fff;
-  }
-  .menu-links a:focus-visible { outline: 2px solid #fff; outline-offset: -3px; }
-  .idx { color: #ffffff99; font-variant-numeric: tabular-nums; min-width: 1.3em; }
-  .name { flex: 1; }
-  /* Small dot on the page you're on */
-  .here { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); visibility: hidden; }
-  .menu-links a[aria-current='page'] .here { visibility: visible; }
-
-  @media (max-width: 760px) {
-    .menu-panel { width: 420px; padding-bottom: 10px; }
-  }
-  @media (prefers-reduced-transparency: reduce) {
-    .menu-panel { background: #292929; backdrop-filter: none; }
-  }
 </style>
