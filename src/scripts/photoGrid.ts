@@ -9,7 +9,7 @@
    1,000. */
 import { lensScreen, lensSource, type CardDraw } from './gallery';
 
-type Gallery = { draw: (...a: any[]) => void; aspectOf: (i: number) => number | null };
+type Gallery = { draw: (...a: any[]) => void; aspectOf: (i: number) => number | null; playGifs: (on: boolean) => void };
 type Item = { title: string; kind?: string; more?: unknown[] };
 // Videos and links are marked before their title
 const mark: Record<string, string> = { video: '▶ ', link: '↗ ' };
@@ -21,7 +21,7 @@ export function createPhotoField(opts: {
   onHover: (i: number) => void; // photo index, or -1
   onOpen: (i: number) => void;
   reduced?: boolean; // skip the entrance
-  loader?: HTMLElement; // ring showing how many covers have loaded
+  loader?: HTMLElement; // spinner shown while the covers load
 }) {
   const { canvas, labels, gallery } = opts;
   let items: Item[] = [];
@@ -126,35 +126,36 @@ export function createPhotoField(opts: {
     for (let i = 0; i < n; i++) if (gallery.aspectOf(i) !== null) k++;
     return k;
   };
-  const showLoader = (p: number | null) => {
+  const showLoader = (on: boolean) => {
     const el = opts.loader;
     if (!el) return;
-    if (p === null) { el.classList.remove('on'); return; }
+    if (!on) { el.classList.remove('on'); return; }
     el.hidden = false;
     el.classList.add('on');
-    el.style.setProperty('--p', String(p));
-    el.querySelector('span')!.textContent = `${Math.round(p * 100)}%`;
   };
   const INTRO = 1.6; // seconds until the furthest photo has landed
   const easeOut = (t: number) => 1 - Math.pow(1 - t, 4);
   const grow = (x: number, y: number) => {
     if (introAt < 0) return 1;
     const t = (performance.now() - introAt) / 1000;
-    if (t > INTRO) { introAt = -1; return 1; }
+    if (t > INTRO) { introAt = -1; gallery.playGifs(true); return 1; }
     const d = Math.min(1, Math.hypot(x - W / 2, y - H / 2) / Math.hypot(W / 2, H / 2));
     return easeOut(Math.min(1, Math.max(0, (t - 0.05 - d * 0.55) / 0.9)));
   };
   const start = () => {
     waitingSince = -1;
-    if (opts.reduced) return;
+    if (opts.reduced) { gallery.playGifs(true); return; }
     introAt = performance.now();
     // Start a little below and glide up into place
     oy += pitchY * 0.35; vy = -pitchY * 0.35 * 4; vx = 0;
   };
-  const intro = () => { introAt = -1; waitingSince = performance.now(); };
+  // GIFs hold still (and aren't even read yet) until the photos have bloomed
+  // in, so their heavy first decode doesn't stutter the loading or the bloom
+  const intro = () => { introAt = -1; waitingSince = performance.now(); gallery.playGifs(false); };
 
   // ── Titles: a pool of spans placed over the photos each frame ──
   const pool: HTMLSpanElement[] = [];
+  let placedAt = '';
   const placeLabels = (cells: ReturnType<typeof box>[]) => {
     let k = 0;
     for (const b of cells) {
@@ -256,9 +257,9 @@ export function createPhotoField(opts: {
     // Hold the entrance until the covers are in
     if (waitingSince >= 0) {
       const k = coversLoaded(), waited = performance.now() - waitingSince;
-      if (k >= n || waited > 10000) { showLoader(null); start(); }
+      if (k >= n || waited > 10000) { showLoader(false); start(); }
       else {
-        if (waited > 150) showLoader(k / n);
+        if (waited > 150) showLoader(true);
         gallery.draw(view, [], 0, true); labels.style.opacity = '0'; return;
       }
     }
@@ -274,7 +275,10 @@ export function createPhotoField(opts: {
     }
     // Moving fast strengthens the fringe a little
     gallery.draw(view, cards, Math.min(0.01, Math.hypot(vx, vy) * 0.000004), true);
-    placeLabels(cells);
+    // Titles only need placing when the field has moved (or is blooming in)
+    // (or a late cover changed a photo's shape)
+    const at = `${ox.toFixed(1)},${oy.toFixed(1)},${W},${H},${coversLoaded()}`;
+    if (at !== placedAt || introAt >= 0) { placeLabels(cells); placedAt = introAt >= 0 ? '' : at; }
     if (!dragging) setHover(mx >= 0 && n ? itemAt(mx, my) : -1);
   };
 
@@ -282,7 +286,7 @@ export function createPhotoField(opts: {
     get active() { return active; },
     get dragging() { return dragging; },
     setItems(next: Item[]) {
-      items = next; n = next.length;
+      items = next; n = next.length; placedAt = '';
       if (n) shuffle();
     },
     activate() {
@@ -295,7 +299,7 @@ export function createPhotoField(opts: {
     intro: () => { if (active) { centre(); intro(); } },
     deactivate() {
       active = false; dragging = false;
-      waitingSince = -1; showLoader(null);
+      waitingSince = -1; showLoader(false); gallery.playGifs(true);
       setHover(-1);
       labels.hidden = true;
       canvas.style.cursor = '';

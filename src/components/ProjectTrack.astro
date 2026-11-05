@@ -84,13 +84,12 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
     <canvas class="gl" aria-hidden="true"></canvas>
     <!-- Titles in the journal field, placed by script -->
     <div class="field-labels mono" aria-hidden="true" hidden></div>
-    <!-- Fills as the journal's cover images arrive, before they bloom in -->
-    <div class="field-loader" role="progressbar" aria-label="Loading the visual journal" hidden>
+    <!-- Spins while the journal's cover images load, before they bloom in -->
+    <div class="field-loader" role="status" aria-label="Loading the visual journal" hidden>
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <circle class="track" cx="24" cy="24" r="20" />
         <circle class="bar" cx="24" cy="24" r="20" pathLength="100" />
       </svg>
-      <span class="mono">0%</span>
     </div>
     <p class="empty mono" hidden>Coming soon</p>
 
@@ -742,14 +741,14 @@ const clientSets = tabs.map((s) => ({ key: s.key, items: s.items.map(({ title, i
   }
   .field-loader[hidden] { display: none; }
   .field-loader.on { opacity: 1; scale: 1; }
-  .field-loader svg { position: absolute; inset: 0; width: 100%; height: 100%; rotate: -90deg; }
+  /* A quarter arc going round at a steady pace. A transform animation, so the
+     browser keeps it turning even while the page is busy loading */
+  .field-loader svg { position: absolute; inset: 0; width: 100%; height: 100%; animation: field-spin 0.9s linear infinite; }
   .field-loader circle { fill: none; stroke-width: 2; }
   .field-loader .track { stroke: var(--line-strong); }
-  .field-loader .bar {
-    stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100;
-    stroke-dashoffset: calc(100 - var(--p, 0) * 100); transition: stroke-dashoffset 0.35s var(--ease);
-  }
-  .field-loader span { font-size: var(--step--2); color: var(--mute); }
+  .field-loader .bar { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 25 75; }
+  @keyframes field-spin { to { rotate: 360deg; } }
+  @media (prefers-reduced-motion: reduce) { .field-loader svg { animation-duration: 3s; } }
   .field-labels :global(span) {
     position: absolute; left: 0; top: 0; transform-origin: 0 0; white-space: nowrap;
     font-size: var(--step--2); color: var(--mute); text-transform: uppercase; letter-spacing: 0.04em;

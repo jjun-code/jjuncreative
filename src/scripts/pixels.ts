@@ -100,8 +100,11 @@ export function mountPixels(canvas: HTMLCanvasElement, { reduced }: Opts) {
   const clickT = new Float32Array(MAX_CLICKS);
   let next = 0, raf = 0, running = false, time = 0, last = performance.now();
 
+  // Phones: drawn at 1× (the pixels are chunky blocks anyway) and at about
+  // 30 fps (the field drifts slowly), a fraction of the GPU work
+  const phone = matchMedia('(pointer: coarse)').matches;
   const resize = () => {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = phone ? 1 : Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(canvas.clientWidth * dpr);
     canvas.height = Math.round(canvas.clientHeight * dpr);
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -129,10 +132,11 @@ export function mountPixels(canvas: HTMLCanvasElement, { reduced }: Opts) {
   }
 
   const loop = (now: number) => {
+    raf = requestAnimationFrame(loop);
+    if (phone && now - last < 30) return;
     time += Math.min(0.1, (now - last) / 1000) * SPEED * 5;
     last = now;
     draw();
-    raf = requestAnimationFrame(loop);
   };
 
   const ro = new ResizeObserver(resize);
