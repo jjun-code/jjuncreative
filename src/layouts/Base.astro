@@ -35,12 +35,13 @@ const person = Astro.url.pathname === '/' && {
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0b0b0b" />
-    <!-- Apply the saved or system theme before first paint, so there's no flash -->
+    <!-- Apply the saved theme (dark if none) before first paint, so there's no flash -->
     <script is:inline>
       (() => {
         let t = null;
         try { t = localStorage.getItem('theme'); } catch {}
-        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        // Dark unless the visitor has picked light with the theme button
+        if (t !== 'light' && t !== 'dark') t = 'dark';
         document.documentElement.dataset.theme = t;
         // First page of the session shows the loader
         let seen = false;

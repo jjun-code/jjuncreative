@@ -17,7 +17,10 @@ export function makeVeil(canvas: HTMLCanvasElement, { cell = 10, from = 'bottom-
     cw = Math.ceil(window.innerWidth / cell); ch = Math.ceil(window.innerHeight / cell);
     canvas.width = cw; canvas.height = ch;
     img = ctx.createImageData(cw, ch);
-    const m = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().match(/^#?([0-9a-f]{6})$/i);
+    // The canvas normalises any colour (the published CSS shortens #ffffff to
+    // #fff) to #rrggbb, which is then read as numbers
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#141414';
+    const m = String(ctx.fillStyle).match(/^#([0-9a-f]{6})$/i);
     if (m) rgb = [0, 2, 4].map((o) => parseInt(m[1].slice(o, o + 2), 16));
     draw(last);
   };
